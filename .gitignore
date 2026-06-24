@@ -1,0 +1,15 @@
+node_modules/
+.next/
+*.pyc
+__pycache__/
+.env
+.env.local
+backend/venv/
+backend/__pycache__/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+*.log
+data/tiles/*.mbtiles
+data/tiles/*.pmtiles

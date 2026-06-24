@@ -1,0 +1,38 @@
+{
+  "name": "halvaa-frontend",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mapbox/mapbox-gl-rtl-text": "^0.4.0",
+    "@protomaps/basemaps": "^5.7.2",
+    "framer-motion": "^12.40.0",
+    "maplibre-gl": "^5.24.0",
+    "next": "^16.2.7",
+    "next-intl": "^4.13.0",
+    "pmtiles": "^4.4.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "swiper": "^12.2.0",
+    "swr": "^2.4.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.28.0",
+    "eslint-config-next": "^16.2.7",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5.9.3"
+  }
+}

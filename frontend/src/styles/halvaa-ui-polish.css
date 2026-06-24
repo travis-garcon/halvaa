@@ -1,0 +1,682 @@
+/**
+ * Halvaa UI polish — design-system/halvaa/MASTER.md
+ * Applied on top of legacy app.css; does not replace brand layout.
+ */
+
+:root {
+  --halvaa-primary: #ff6b00;
+  --halvaa-primary-soft: #fff4ec;
+  --halvaa-bg: #ffffff;
+  --halvaa-surface: #fafafa;
+  --halvaa-text: #111111;
+  --halvaa-text-muted: #475569;
+  --halvaa-border: #e2e8f0;
+  --halvaa-error: #dc2626;
+  --halvaa-success: #16a34a;
+  --halvaa-focus-ring: 0 0 0 3px rgba(255, 107, 0, 0.35);
+  --halvaa-transition: 200ms ease-out;
+  --z-sticky: 10;
+  --z-overlay: 30;
+  --z-modal: 50;
+  --z-notification: 60;
+}
+
+/* ——— Focus & interaction (all clickable) ——— */
+.btn-primary,
+.btn-secondary,
+.nav-item,
+.filter-chip,
+.upgrade-card,
+.memorial-card,
+.hero-featured-portrait,
+.see-all-link,
+.site-header .nav-left a,
+.site-header .nav-left button,
+.mobile-menu__links a,
+.mobile-menu__links button,
+.footer-nav a,
+.footer-nav button,
+.auth-tab,
+.credit-pack-btn,
+.language-selector,
+.lang-menu-item,
+.modal-close,
+.mobile-cta,
+.forgot-link {
+  cursor: pointer;
+  transition:
+    background-color var(--halvaa-transition),
+    border-color var(--halvaa-transition),
+    box-shadow var(--halvaa-transition),
+    color var(--halvaa-transition),
+    opacity var(--halvaa-transition),
+    transform var(--halvaa-transition);
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.nav-item:focus-visible,
+.filter-chip:focus-visible,
+.upgrade-card:focus-visible,
+.memorial-card:focus-visible,
+.hero-featured-portrait:focus-visible,
+.see-all-link:focus-visible,
+.explore-modern-link .see-all-link:focus-visible,
+.site-header .nav-left a:focus-visible,
+.site-header .nav-left button:focus-visible,
+.mobile-menu__links button:focus-visible,
+.footer-nav button:focus-visible,
+.auth-tab:focus-visible,
+.form-input:focus-visible,
+.search-input:focus-visible,
+.language-selector:focus-visible,
+.lang-menu-item:focus-visible,
+.modal-close:focus-visible,
+.mobile-cta:focus-visible,
+.forgot-link:focus-visible {
+  outline: none;
+  box-shadow: var(--halvaa-focus-ring);
+}
+
+/* ——— Cards: shadow hover, no layout shift ——— */
+.memorial-card:hover {
+  transform: none !important;
+  box-shadow: 0 12px 32px rgba(17, 17, 17, 0.1);
+}
+
+.upgrade-card:hover {
+  transform: none;
+  box-shadow: 0 10px 28px rgba(255, 107, 0, 0.12);
+  border-color: rgba(255, 107, 0, 0.25);
+}
+
+.filter-chip:hover:not(.active) {
+  background: var(--halvaa-primary-soft);
+  border-color: rgba(255, 107, 0, 0.2);
+}
+
+.filter-chip.active {
+  background: var(--halvaa-primary);
+  color: #fff;
+}
+
+/* ——— Trust strip ——— */
+.halvaa-trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  justify-content: center;
+  padding: 0 24px 28px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.halvaa-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--halvaa-border);
+  color: var(--halvaa-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.halvaa-trust-item svg {
+  flex-shrink: 0;
+  color: var(--halvaa-primary);
+}
+
+html[dir="rtl"] .halvaa-trust-strip,
+html[lang="fa"] .halvaa-trust-strip {
+  direction: rtl;
+}
+
+/* ——— Feature icons ——— */
+.feature-item {
+  transition: box-shadow var(--halvaa-transition);
+}
+
+.feature-item:hover {
+  box-shadow: var(--halvaa-shadow-md, 0 8px 24px rgba(17, 17, 17, 0.08));
+}
+
+.feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: var(--halvaa-primary-soft);
+  color: var(--halvaa-primary);
+}
+
+.feature-title {
+  color: var(--halvaa-text);
+}
+
+.feature-description {
+  color: var(--halvaa-text-muted);
+}
+
+/* ——— Hero gallery polish ——— */
+.hero-featured-card {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.hero-featured-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.hero-featured-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--halvaa-border);
+  cursor: pointer;
+  transition: background-color var(--halvaa-transition), transform var(--halvaa-transition);
+}
+
+.hero-featured-dot.is-active {
+  background: var(--halvaa-primary);
+  transform: scale(1.15);
+}
+
+.hero-featured-dot:focus-visible {
+  outline: none;
+  box-shadow: var(--halvaa-focus-ring);
+}
+
+.hero-featured-portrait:focus-visible {
+  opacity: 1;
+}
+
+/* ——— Hover states for interactive elements ——— */
+.auth-tab:hover:not(.active) {
+  background: var(--halvaa-primary-soft);
+  border-color: rgba(255, 107, 0, 0.2);
+}
+
+.modal-close:hover {
+  opacity: 0.7;
+}
+
+.nav-item:hover:not(.active) {
+  color: var(--halvaa-primary);
+}
+
+.site-header .nav-left button:hover:not(.active) {
+  color: var(--halvaa-primary);
+}
+
+.mobile-menu__links button:hover {
+  background: var(--halvaa-primary-soft);
+}
+
+.mobile-menu__close:hover {
+  opacity: 0.7;
+}
+
+.hero-featured-dot:not(.is-active):hover {
+  background: var(--halvaa-primary);
+  opacity: 0.5;
+}
+
+.credit-pack-btn:hover {
+  border-color: var(--halvaa-primary);
+  box-shadow: 0 4px 12px rgba(255, 107, 0, 0.15);
+}
+
+.bottom-nav .nav-item:hover:not(.active) {
+  color: var(--halvaa-primary);
+}
+
+.footer-nav button:hover {
+  text-decoration: underline;
+}
+
+/* ——— Nav buttons (match legacy link styles) ——— */
+.site-header .nav-left button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  color: #5b5e63;
+  text-decoration: none;
+}
+
+.site-header .nav-left button.active {
+  color: var(--halvaa-primary);
+  font-weight: 600;
+}
+
+.mobile-menu__links button {
+  display: block;
+  width: 100%;
+  text-align: inherit;
+  background: none;
+  border: 0;
+  padding: 12px 6px;
+  color: #2b2b2b;
+  font-size: 16px;
+}
+
+.footer-nav button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: none;
+}
+
+.mobile-cta {
+  border: 0;
+  font: inherit;
+}
+
+@media (max-width: 768px) {
+  .mobile-cta--auth {
+    display: flex;
+  }
+}
+
+.mobile-cta--auth {
+  display: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: transparent;
+  padding: 0;
+}
+
+.mobile-cta__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2b2b2b;
+}
+
+.mobile-cta__signout {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3f51b5;
+}
+
+.forgot-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.explore-empty-hint {
+  padding: 0 24px 12px;
+  font-size: 14px;
+  color: var(--halvaa-text-muted);
+  text-align: center;
+}
+
+/* ——— Form inputs ——— */
+.form-input,
+.search-input {
+  color: var(--halvaa-text);
+  border-color: var(--halvaa-border);
+  transition: border-color var(--halvaa-transition), box-shadow var(--halvaa-transition);
+}
+
+.form-input::placeholder,
+.search-input::placeholder {
+  color: #64748b;
+}
+
+/* ——— Subtitle contrast ——— */
+.subtitle,
+.tab-subtitle,
+.hero-featured-role {
+  color: var(--halvaa-text-muted);
+}
+
+/* ——— Legacy explore → modern explore bridge ——— */
+.explore-modern-link {
+  margin: 16px 24px 8px;
+  text-align: center;
+}
+
+.explore-modern-link .see-all-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 107, 0, 0.25);
+  background: var(--halvaa-primary-soft);
+  color: var(--halvaa-primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.explore-modern-link .see-all-link:hover {
+  background: rgba(255, 107, 0, 0.12);
+  border-color: rgba(255, 107, 0, 0.4);
+}
+
+/* ——— Reduced motion ——— */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .hero-featured-portrait {
+    transition: none;
+  }
+
+  .hero-featured-dot.is-active {
+    transform: none;
+  }
+
+  .hero-featured-dot:not(.is-active):hover {
+    transition: none;
+  }
+}
+
+/* ——— Z-index scale ——— */
+.modal {
+  z-index: var(--z-modal);
+}
+
+.modal-content {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.modal-overlay {
+  z-index: 1;
+}
+
+.mobile-menu {
+  z-index: var(--z-overlay);
+}
+
+.site-header {
+  z-index: var(--z-sticky);
+}
+
+.bottom-nav {
+  z-index: var(--z-sticky);
+}
+
+.memorial-modal-fullscreen .modal-close {
+  z-index: calc(var(--z-modal) + 1);
+}
+
+/* ——— Hero backlight animation ——— */
+@keyframes heroBacklight {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  25% { transform: translate(8%, -6%) scale(1.08); opacity: 0.7; }
+  50% { transform: translate(-4%, 4%) scale(0.95); opacity: 0.5; }
+  75% { transform: translate(6%, -3%) scale(1.05); opacity: 0.65; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+}
+
+.hero-backlight {
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: radial-gradient(circle at 30% 40%, rgba(255, 107, 0, 0.25), transparent 50%);
+  animation: heroBacklight 10s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.hero-glass-card {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.75);
+  transition: box-shadow var(--halvaa-transition), border-color var(--halvaa-transition);
+}
+
+.hero-glass-card:hover {
+  box-shadow: 0 16px 40px rgba(255, 107, 0, 0.1);
+  border-color: rgba(255, 107, 0, 0.2);
+}
+
+.hero-placeholder-card {
+  transition: transform var(--halvaa-transition), box-shadow var(--halvaa-transition);
+}
+
+.hero-placeholder-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 20px rgba(255, 107, 0, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-backlight {
+    animation: none;
+    opacity: 0.15;
+  }
+
+  .hero-placeholder-card:hover {
+    transform: none;
+  }
+}
+
+/* ——— Skeleton / pulse loading ——— */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--halvaa-border) 25%, #f1f5f9 50%, var(--halvaa-border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+.skeleton-text-sm {
+  height: 10px;
+  width: 60%;
+}
+
+.skeleton-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+}
+
+.skeleton-card {
+  height: 120px;
+  border-radius: 16px;
+}
+
+/* ——— Loading spinner ——— */
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.btn-loading::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin: -8px 0 0 -8px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: btn-spin 0.6s linear infinite;
+}
+
+.btn-loading span {
+  visibility: hidden;
+}
+
+/* ——— Disabled interactive states ——— */
+button:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.halvaa-btn-primary:disabled,
+.halvaa-btn-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ——— Feedback text colors ——— */
+.feedback-success {
+  color: var(--halvaa-success);
+}
+
+.feedback-error {
+  color: var(--halvaa-error);
+}
+
+/* ——— Page entrance fade ——— */
+.page-entrance {
+  animation: pageFadeIn 0.4s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ——— Modal entrance ——— */
+.modal-entrance .modal-content {
+  animation: modalSlideIn 0.25s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ——— Skip-to-content link ——— */
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 16px;
+  background: var(--halvaa-primary);
+  color: #fff;
+  border-radius: 0 0 8px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 150ms ease-out;
+}
+
+.skip-to-content:focus {
+  top: 0;
+  outline: none;
+  box-shadow: var(--halvaa-focus-ring);
+}
+
+/* ——— Staggered card entrance ——— */
+.stagger-enter {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.stagger-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+/* ——— Gallery image hover ——— */
+.gallery-item {
+  overflow: hidden;
+  border-radius: 12px;
+  transition: box-shadow var(--halvaa-transition);
+}
+
+.gallery-item:hover {
+  box-shadow: 0 8px 24px rgba(17, 17, 17, 0.1);
+}
+
+.gallery-item img {
+  transition: transform 0.3s ease-out;
+}
+
+.gallery-item:hover img {
+  transform: scale(1.05);
+}
+
+/* ——— Explore hub loading skeleton ——— */
+.explore-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.explore-skeleton-cell {
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+/* ——— Mobile responsive tweaks ——— */
+@media (max-width: 480px) {
+  .hero-glass-card {
+    padding: 16px;
+  }
+
+  .hero-glass-card .grid-cols-3 {
+    gap: 6px;
+  }
+
+  .hero-placeholder-card {
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-modal .auth-form {
+    padding: 0;
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .memorial-profile-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

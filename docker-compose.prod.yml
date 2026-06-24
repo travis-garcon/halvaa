@@ -1,0 +1,78 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-halvaa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-halvaa}
+      POSTGRES_DB: ${POSTGRES_DB:-halvaa}
+    volumes:
+      - halvaa_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-halvaa} -d ${POSTGRES_DB:-halvaa}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - halvaa_redis:/data
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ${BACKEND_ENV_FILE:-./backend/.env}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://halvaa:halvaa@db:5432/halvaa}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      UPLOAD_DIR: /app/uploads
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - halvaa_uploads:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+        NEXT_PUBLIC_DEMO_FALLBACK: ${NEXT_PUBLIC_DEMO_FALLBACK:-false}
+        NEXT_PUBLIC_MAP_STYLE_URL: ${NEXT_PUBLIC_MAP_STYLE_URL:-}
+        NEXT_PUBLIC_LOCAL_MAP_PM_TILES_URL: ${NEXT_PUBLIC_LOCAL_MAP_PM_TILES_URL:-}
+        NEXT_PUBLIC_LOCAL_MAP_ASSETS_URL: ${NEXT_PUBLIC_LOCAL_MAP_ASSETS_URL:-}
+        NEXT_PUBLIC_LOCAL_MAP_TERRAIN_PM_TILES_URL: ${NEXT_PUBLIC_LOCAL_MAP_TERRAIN_PM_TILES_URL:-}
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+      NEXT_PUBLIC_DEMO_FALLBACK: ${NEXT_PUBLIC_DEMO_FALLBACK:-false}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- \"http://$(hostname):3000/en\" >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  halvaa_pgdata:
+  halvaa_redis:
+  halvaa_uploads:
