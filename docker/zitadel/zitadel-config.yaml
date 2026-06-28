@@ -1,0 +1,16 @@
+Log:
+  Level: info
+
+ExternalDomain: 46.249.101.229
+ExternalPort: 8080
+ExternalSecure: false
+
+FirstInstance:
+  Org:
+    Name: Halvaa Local
+  Machine:
+    Machine:
+      Username: halvaa-admin
+      Name: Halvaa Admin
+    Pat:
+      ExpirationDate: "2099-01-01T00:00:00Z"

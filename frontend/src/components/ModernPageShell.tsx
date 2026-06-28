@@ -16,7 +16,7 @@ export function ModernPageShell({ children }: ModernPageShellProps) {
   return (
     <>
       <Header onSignIn={() => setAuthOpen(true)} />
-      <main>{children}</main>
+      <main className="min-h-screen pb-24 md:pb-0">{children}</main>
       <ModernSiteFooter />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </>

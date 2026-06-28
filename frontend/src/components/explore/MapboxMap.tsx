@@ -25,7 +25,7 @@ const MAP_LABEL_FONT = ["Noto Sans Regular"];
 const MAP_LABEL_FONT_MEDIUM = ["Noto Sans Medium"];
 
 function createLocalMapStyle(config: LocalMapConfig, locale: string): StyleSpecification {
-  const baseLayers = layers("protomaps", namedFlavor("light"), { lang: locale === "fa" ? "fa" : "en" }) as StyleSpecification["layers"];
+  const baseLayers = layers("protomaps", namedFlavor("light"), { lang: locale === "fa" || locale === "ar" ? locale : "en" }) as StyleSpecification["layers"];
   const localizedBaseLayers = baseLayers.map((layer) => {
     if (layer.type !== "symbol") {
       return layer;
@@ -230,7 +230,7 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
         maplibregl.addProtocol("pmtiles", protocol.tile);
         pmtilesProtocolRegistered = true;
       }
-      if (localMapConfig.enabled && locale === "fa" && !rtlTextPluginRegistered) {
+      if ((locale === "fa" || locale === "ar") && !rtlTextPluginRegistered) {
         maplibregl.setRTLTextPlugin("/mapbox-gl-rtl-text.js", true);
         rtlTextPluginRegistered = true;
       }
@@ -247,7 +247,7 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
         attributionControl: false,
       });
 
-      map.addControl(new maplibregl.NavigationControl(), "top-right");
+      map.addControl(new maplibregl.NavigationControl(), locale === "fa" || locale === "ar" ? "top-left" : "top-right");
       mapRef.current = map;
 
       map.on("load", () => {
@@ -451,7 +451,7 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
       />
 
       {hasStyleUrl && status !== "error" && (
-        <div className="absolute left-4 top-4 flex gap-2 rounded-full border border-border bg-background/90 p-1 shadow-soft backdrop-blur ltr:flex-row rtl:flex-row-reverse">
+        <div className="absolute top-4 flex gap-2 rounded-full border border-border bg-background/90 p-1 shadow-soft backdrop-blur ltr:left-4 rtl:right-4">
           <button
             type="button"
             onClick={toggleTilt}

@@ -1,0 +1,23 @@
+FirstInstance:
+  InstanceName: Halvaa Local
+  DefaultLanguage: en
+  Org:
+    Name: Halvaa Local
+    Human:
+      Username: admin
+      FirstName: Halvaa
+      LastName: Admin
+      NickName: admin
+      DisplayName: Halvaa Admin
+      Email:
+        Address: admin@halvaa.local
+        Verified: true
+      PreferredLanguage: en
+      Password: Admin1234!
+      PasswordChangeRequired: false
+    Machine:
+      Machine:
+        Username: halvaa-admin
+        Name: Halvaa Admin
+      Pat:
+        ExpirationDate: "2099-01-01T00:00:00Z"

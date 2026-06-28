@@ -15,11 +15,12 @@ export default async function ExplorePage({ params }: ExplorePageProps) {
 
   return (
     <ModernPageShell>
-      <section>
-        <div className="halvaa-container py-4 space-y-6 ltr:text-left rtl:text-right">
-          <div>
-            <h1 className="text-4xl font-bold text-foreground">{t("title")}</h1>
-            <p className="mt-4 max-w-2xl text-muted">{t("subtitle")}</p>
+      <section className="py-5 sm:py-8">
+        <div className="halvaa-container space-y-6 ltr:text-left rtl:text-right">
+          <div className="app-card rounded-[2rem] p-5 sm:p-8">
+            <span className="app-chip">{t("openModernExplore")}</span>
+            <h1 className="mt-4 text-4xl font-black leading-tight text-foreground sm:text-6xl">{t("title")}</h1>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-muted">{t("subtitle")}</p>
           </div>
           <ExploreHub locale={locale} />
         </div>

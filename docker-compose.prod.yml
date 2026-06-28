@@ -20,6 +20,67 @@ services:
     volumes:
       - halvaa_redis:/data
 
+  zitadel-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${ZITADEL_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${ZITADEL_DB_PASSWORD:-zitadel-local-password}
+      POSTGRES_DB: ${ZITADEL_DB:-zitadel}
+    volumes:
+      - halvaa_zitadel_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ZITADEL_DB_USER:-postgres} -d ${ZITADEL_DB:-zitadel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:latest
+    user: "0:0"
+    restart: unless-stopped
+    command:
+      - "start-from-init"
+      - "--masterkey"
+      - "${ZITADEL_MASTERKEY:-MasterkeyForHalvaa123!}"
+      - "--tlsMode"
+      - "disabled"
+      - "--init-projections"
+      - "true"
+      - "--config"
+      - "/zitadel-config.yaml"
+      - "--steps"
+      - "/zitadel-init-steps.yaml"
+    environment:
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: ${ZITADEL_DB:-halvaa}
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: ${ZITADEL_DB_USER:-postgres}
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_DB_PASSWORD:-zitadel-local-password}
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_EXISTINGDATABASE: ${ZITADEL_DB:-zitadel}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: ${ZITADEL_DB_USER:-postgres}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${ZITADEL_DB_PASSWORD:-zitadel-local-password}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_EXTERNALSECURE: false
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_EXTERNALDOMAIN:-46.249.101.229}
+      ZITADEL_EXTERNALPORT: ${ZITADEL_PORT:-8080}
+      ZITADEL_FIRSTINSTANCE_PATPATH: ${ZITADEL_PAT_PATH:-/zitadel-admin.pat}
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    ports:
+      - "${ZITADEL_PORT:-8080}:8080"
+    volumes:
+      - ./docker/zitadel/zitadel-config.yaml:/zitadel-config.yaml:ro
+      - ./docker/zitadel/zitadel-init-steps.yaml:/zitadel-init-steps.yaml:ro
+      - halvaa_zitadel_pat:/pat
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready", "--config", "/zitadel-config.yaml"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
   backend:
     build:
       context: ./backend
@@ -36,6 +97,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      zitadel:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
@@ -76,3 +139,5 @@ volumes:
   halvaa_pgdata:
   halvaa_redis:
   halvaa_uploads:
+  halvaa_zitadel_pgdata:
+  halvaa_zitadel_pat:

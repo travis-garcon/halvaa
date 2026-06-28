@@ -1,0 +1,29 @@
+{
+  "name": "Halvaa",
+  "short_name": "Halvaa",
+  "description": "Create, explore, and contribute to memorials.",
+  "start_url": "/en",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f4f5",
+  "theme_color": "#ff6b00",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Explore",
+      "url": "/en/explore"
+    },
+    {
+      "name": "Create Memorial",
+      "url": "/en/memorial/create"
+    }
+  ]
+}

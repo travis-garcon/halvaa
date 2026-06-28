@@ -48,7 +48,18 @@ class ExploreMemorialCard(BaseModel):
     updated_at: datetime
     published_at: datetime | None = None
     featured_at: datetime | None = None
+    image_url: str | None = None
 
 
 class ExploreMemorialFeed(BaseModel):
     items: list[ExploreMemorialCard]
+
+
+class LandingMemorialCategory(BaseModel):
+    category: str
+    label: str | None = None
+    items: list[ExploreMemorialCard]
+
+
+class LandingMemorialFeed(BaseModel):
+    categories: list[LandingMemorialCategory]

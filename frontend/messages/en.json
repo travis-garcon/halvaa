@@ -5,7 +5,8 @@
     "messages": "Messages",
     "store": "Store",
     "profile": "Profile",
-    "aria_label": "Main navigation"
+    "aria_label": "Main navigation",
+    "create": "Create"
   },
   "hero": {
     "title": {
@@ -52,8 +53,8 @@
     "coming_soon_body": "Credit purchases will be available in a future update. Your selection was noted."
   },
   "auth": {
-    "sign_in_sso": "Sign in with Halvaa SSO",
-    "or_email": "or sign in with email",
+    "sign_in_sso": "Sign up with Google",
+    "or_email": "or continue with one-time code",
     "sign_in": "Sign In",
     "sign_up": "Sign Up",
     "sign_out": "Sign Out",
@@ -61,6 +62,7 @@
     "password": "Password",
     "full_name": "Full Name",
     "phone_number": "Phone Number",
+    "identifier": "Email or phone number",
     "create_account": "Create Account",
     "welcome_back": "Welcome back!",
     "tagline": "Remember Together",
@@ -68,8 +70,14 @@
     "forgot_password_notice": "Password reset is not available yet. Please contact support if you need help.",
     "signing_in": "Signing in…",
     "signing_up": "Creating account…",
-    "error_invalid": "Invalid email or password.",
-    "error_generic": "Something went wrong. Please try again."
+    "error_invalid": "Invalid or expired code.",
+    "error_generic": "Something went wrong. Please try again.",
+    "otp_send": "Continue",
+    "otp_sending": "Sending code…",
+    "otp_code": "Verification code",
+    "otp_verify": "Verify code",
+    "otp_verifying": "Verifying…",
+    "otp_sent": "We sent a verification code to your email or phone."
   },
   "memorial": {
     "create": "Create Memorial",
@@ -170,6 +178,8 @@
     "create_memorial": "Create Memorial",
     "localeEn": "English",
     "localeFa": "فارسی",
+    "localeAr": "العربية",
+    "localeZh": "中文",
     "notFoundTitle": "Page not found",
     "notFoundBody": "The page you are looking for does not exist.",
     "backHome": "Back to Home",
@@ -570,5 +580,27 @@
   "metadata": {
     "title": "Halvaa - Where Memories Live Forever",
     "description": "Halvaa is a space to honor those who've passed, share memories, and keep their legacy alive."
+  },
+  "landingStory": {
+    "eyebrow": "Why Halvaa",
+    "title": "A living record, shaped with care",
+    "paragraphs": {
+      "0": "Halvaa gives every life a place that feels personal, searchable, and lasting.",
+      "1": "Families can preserve media, timelines, locations, and stories without turning memory into noise.",
+      "2": "Communities can contribute corrections and context, so each memorial can become more complete over time.",
+      "3": "The platform is built for dignity: clear authorship, thoughtful moderation, and access across languages."
+    },
+    "cta": "Explore memorials"
+  },
+  "contribution": {
+    "eyebrow": "Contribute",
+    "title": "Suggest an edit",
+    "biographyPlaceholder": "Add a sourced correction, story detail, or missing biography note.",
+    "sourcePlaceholder": "Source or family note (optional)",
+    "submit": "Submit suggestion",
+    "submitting": "Submitting...",
+    "submitted": "Suggestion submitted for review.",
+    "error": "Could not submit suggestion.",
+    "signInRequired": "Sign in first to suggest edits."
   }
 }

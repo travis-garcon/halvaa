@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
+import { ContributionBox } from "@/components/memorial/ContributionBox";
 import { GuestbookSection } from "@/components/memorial/GuestbookSection";
 import { MemorialTimeline } from "@/components/memorial/MemorialTimeline";
 import { MemorialThemeRoot } from "@/components/MemorialThemeRoot";
@@ -431,6 +432,8 @@ export function MemorialProfile({ slug }: MemorialProfileProps) {
               </div>
             )}
           </div>
+
+          <ContributionBox memorialId={memorial.id} locale={locale} />
 
           {(memorial.burial_site_name || memorial.burial_plot_name || memorial.burial_address) && (
             <div className="rounded-[2rem] border border-border bg-background/95 p-6 shadow-soft sm:p-8">

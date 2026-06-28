@@ -18,11 +18,17 @@ from app.models.collaborator import MemorialCollaborator
 from app.models.enums import (
     CollaboratorRole,
     GuestbookStatus,
+    MediaCategory,
+    MediaProcessingStatus,
+    MediaType,
     MemorialStatus,
     TimelineEventType,
+    UserRole,
 )
 from app.models.guestbook import GuestbookEntry
+from app.models.media import MediaAsset
 from app.models.memorial import Memorial
+from app.models.store import LandingMemorialPlacement
 from app.models.timeline import TimelineEvent
 from app.models.user import User
 from app.services.geo import point_from_lat_lng
@@ -121,7 +127,23 @@ MEMORIALS: list[dict] = [
                 "biography": "حماسه‌سرای ایرانی و خالق شاهنامه.",
                 "epitaph": "زبان فارسی را با شعر زنده کرد.",
             },
+            "ar": {
+                "name": "الفردوسي",
+                "biography": "شاعر ملحمي فارسي ومؤلف الشاهنامه.",
+                "epitaph": "أحيا اللغة الفارسية بالشعر.",
+            },
+            "zh": {
+                "name": "菲尔多西",
+                "biography": "伊朗史诗诗人，《列王纪》的作者。",
+                "epitaph": "他以诗歌延续了波斯语的生命。",
+            },
         },
+        "gallery": [
+            {
+                "url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Ferdowsi_statue_in_Tus.jpg",
+                "title": "Ferdowsi memorial statue",
+            }
+        ],
     },
     {
         "slug": "parvin-etesami",
@@ -133,7 +155,15 @@ MEMORIALS: list[dict] = [
         "translations": {
             "en": {"name": "Parvin Etesami", "biography": "Celebrated Persian poet and essayist."},
             "fa": {"name": "پروین اعتصامی", "biography": "شاعر و نویسنده برجسته فارسی."},
+            "ar": {"name": "بروين اعتصامي", "biography": "شاعرة وكاتبة فارسية بارزة."},
+            "zh": {"name": "帕尔文·埃特萨米", "biography": "著名波斯诗人与作家。"},
         },
+        "gallery": [
+            {
+                "url": "https://upload.wikimedia.org/wikipedia/commons/3/39/Parvin_E%27tesami.jpg",
+                "title": "Parvin Etesami portrait",
+            }
+        ],
     },
     {
         "slug": "sohrab-sepehri",
@@ -145,7 +175,71 @@ MEMORIALS: list[dict] = [
         "translations": {
             "en": {"name": "Sohrab Sepehri", "biography": "Modern poet and painter of quiet landscapes."},
             "fa": {"name": "سهراب سپهری", "biography": "شاعر و نقاش معاصر منظره‌های آرام."},
+            "ar": {"name": "سهراب سبهري", "biography": "شاعر ورسام إيراني معاصر."},
+            "zh": {"name": "苏赫拉布·塞佩赫里", "biography": "现代伊朗诗人与画家。"},
         },
+        "gallery": [
+            {
+                "url": "https://upload.wikimedia.org/wikipedia/commons/6/66/Sohrab_Sepehri.jpg",
+                "title": "Sohrab Sepehri portrait",
+            }
+        ],
+    },
+    {
+        "slug": "maryam-mirzakhani",
+        "status": MemorialStatus.FEATURED,
+        "birth_date": date(1977, 5, 12),
+        "death_date": date(2017, 7, 14),
+        "burial_address": "California, United States",
+        "offset": (0.014, 0.014),
+        "translations": {
+            "en": {
+                "name": "Maryam Mirzakhani",
+                "biography": "Mathematician and the first woman to receive the Fields Medal.",
+                "epitaph": "She revealed the beauty of hidden geometries.",
+            },
+            "fa": {
+                "name": "مریم میرزاخانی",
+                "biography": "ریاضی‌دان ایرانی و نخستین زن برنده مدال فیلدز.",
+                "epitaph": "زیبایی هندسه‌های پنهان را آشکار کرد.",
+            },
+            "ar": {
+                "name": "مريم ميرزاخاني",
+                "biography": "عالمة رياضيات وأول امرأة تحصل على ميدالية فيلدز.",
+                "epitaph": "كشفت جمال الهندسات الخفية.",
+            },
+            "zh": {
+                "name": "玛丽亚姆·米尔扎哈尼",
+                "biography": "数学家，首位获得菲尔兹奖的女性。",
+                "epitaph": "她揭示了隐藏几何之美。",
+            },
+        },
+        "gallery": [
+            {
+                "url": "https://upload.wikimedia.org/wikipedia/commons/1/1f/Maryam_Mirzakhani_in_2014.jpg",
+                "title": "Maryam Mirzakhani in 2014",
+            }
+        ],
+    },
+    {
+        "slug": "mahatma-gandhi",
+        "status": MemorialStatus.FEATURED,
+        "birth_date": date(1869, 10, 2),
+        "death_date": date(1948, 1, 30),
+        "burial_address": "Raj Ghat, New Delhi",
+        "offset": (-0.014, 0.014),
+        "translations": {
+            "en": {"name": "Mahatma Gandhi", "biography": "Leader of nonviolent resistance and Indian independence.", "epitaph": "Truth and nonviolence as a way of life."},
+            "fa": {"name": "مهاتما گاندی", "biography": "رهبر مقاومت بدون خشونت و استقلال هند.", "epitaph": "حقیقت و عدم خشونت به مثابه راه زندگی."},
+            "ar": {"name": "مهاتما غاندي", "biography": "قائد المقاومة السلمية واستقلال الهند.", "epitaph": "الحقيقة واللاعنف طريق حياة."},
+            "zh": {"name": "圣雄甘地", "biography": "非暴力抵抗与印度独立运动领袖。", "epitaph": "以真理与非暴力作为生活之道。"},
+        },
+        "gallery": [
+            {
+                "url": "https://upload.wikimedia.org/wikipedia/commons/d/d1/Portrait_Gandhi.jpg",
+                "title": "Mahatma Gandhi portrait",
+            }
+        ],
     },
 ]
 
@@ -222,6 +316,7 @@ def get_or_create_dev_user(session: Session) -> User:
         locale="en",
         hashed_password=hash_password(DEV_USER_PASSWORD),
         is_superuser=True,
+        role=UserRole.ADMIN,
     )
     session.add(user)
     session.flush()
@@ -239,8 +334,9 @@ def seed() -> None:
             lat_offset, lng_offset = spec["offset"]
             memorial = session.exec(select(Memorial).where(Memorial.slug == spec["slug"])).first()
             if memorial is None:
-                memorial = Memorial(slug=spec["slug"], created_by_id=user.id)
+                memorial = Memorial(public_id=spec["slug"], slug=spec["slug"], created_by_id=user.id)
 
+            memorial.public_id = spec["slug"]
             memorial.status = spec["status"]
             memorial.birth_date = spec.get("birth_date")
             memorial.death_date = spec.get("death_date")
@@ -264,12 +360,13 @@ def seed() -> None:
             ).first()
             if collaborator is None:
                 session.add(
-                    MemorialCollaborator(
-                        memorial_id=memorial.id,
-                        user_id=user.id,
-                        role=CollaboratorRole.OWNER,
+                        MemorialCollaborator(
+                            memorial_id=memorial.id,
+                            user_id=user.id,
+                            role=CollaboratorRole.OWNER,
+                            accepted_at=now,
+                        )
                     )
-                )
 
             existing_events = session.exec(
                 select(TimelineEvent).where(TimelineEvent.memorial_id == memorial.id)
@@ -285,6 +382,38 @@ def seed() -> None:
                             translations=event_spec["translations"],
                         )
                     )
+
+            existing_media = session.exec(select(MediaAsset).where(MediaAsset.memorial_id == memorial.id)).all()
+            if not existing_media:
+                for index, item in enumerate(spec.get("gallery", [])):
+                    session.add(
+                        MediaAsset(
+                            memorial_id=memorial.id,
+                            media_type=MediaType.IMAGE,
+                            category=MediaCategory.GALLERY if index else MediaCategory.AVATAR,
+                            original_storage_key=item["url"],
+                            thumbnail_storage_key=item["url"],
+                            mime_type="image/jpeg",
+                            file_size_bytes=0,
+                            sort_order=index,
+                            processing_status=MediaProcessingStatus.COMPLETED,
+                            title=item["title"],
+                            translations={"en": {"title": item["title"]}},
+                        )
+                    )
+
+            existing_placement = session.exec(
+                select(LandingMemorialPlacement).where(LandingMemorialPlacement.memorial_id == memorial.id)
+            ).first()
+            if existing_placement is None and spec["status"] == MemorialStatus.FEATURED:
+                session.add(
+                    LandingMemorialPlacement(
+                        memorial_id=memorial.id,
+                        category="featured",
+                        sort_order=len(spec["slug"]),
+                        label="Featured by Halvaa",
+                    )
+                )
 
             existing_guestbook = session.exec(
                 select(GuestbookEntry).where(GuestbookEntry.memorial_id == memorial.id)

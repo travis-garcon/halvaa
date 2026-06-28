@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { routing, type Locale } from "@/i18n/routing";
 import { persianSans } from "@/lib/fonts";
+import { PWARegister } from "@/components/PWARegister";
 import { SWRProvider } from "@/providers/SWRProvider";
 import { isRtlLocale } from "@/lib/theme";
 import "@/styles/globals.css";
@@ -32,6 +33,23 @@ export async function generateMetadata({
   return {
     title: t("title"),
     description: t("description"),
+    applicationName: "Halvaa",
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: "Halvaa",
+    },
+    formatDetection: {
+      telephone: false,
+    },
+    icons: {
+      icon: [
+        { url: "/icon.svg", type: "image/svg+xml" },
+        { url: "/pwa-icon.svg", type: "image/svg+xml", sizes: "any" },
+      ],
+      apple: [{ url: "/pwa-icon.svg", type: "image/svg+xml" }],
+    },
   };
 }
 
@@ -58,6 +76,8 @@ export default async function LocaleLayout({
         <link rel="stylesheet" href="/fonts/iranyekan/fontiran.css" />
         <link rel="preload" href="/fonts/google-sans/google-sans.css" as="style" />
         <link rel="stylesheet" href="/fonts/google-sans/google-sans.css" />
+        <meta name="theme-color" content="#f4f4f5" />
+        <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body
         className={[
@@ -68,7 +88,10 @@ export default async function LocaleLayout({
           .join(" ")}
       >
         <NextIntlClientProvider messages={messages}>
-          <SWRProvider>{children}</SWRProvider>
+          <SWRProvider>
+            {children}
+            <PWARegister />
+          </SWRProvider>
         </NextIntlClientProvider>
       </body>
     </html>

@@ -53,6 +53,7 @@ def memorial_to_public(session: Session, memorial: Memorial) -> MemorialPublic:
 
     return MemorialPublic(
         id=memorial.id,
+        public_id=memorial.public_id,
         slug=memorial.slug,
         status=memorial.status,
         birth_date=memorial.birth_date,

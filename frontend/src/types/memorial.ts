@@ -137,6 +137,7 @@ export type ExploreMemorialFeed = {
     updated_at: string;
     published_at: string | null;
     featured_at: string | null;
+    image_url?: string | null;
   }>;
 };
 

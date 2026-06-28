@@ -144,15 +144,15 @@ export function ExploreWatchGrid({ memorials }: ExploreWatchGridProps) {
 
   return (
     <div className="page-entrance w-full ltr:text-left rtl:text-right">
-      <p className="mb-4 text-sm text-muted">{t("gridHint")}</p>
+      <p className="mb-3 text-xs font-semibold text-muted sm:text-sm">{t("gridHint")}</p>
       <div
         ref={containerRef}
-        className="relative mx-auto overflow-hidden rounded-[2rem] border border-border bg-gradient-to-b from-background to-primary/5"
+        className="relative mx-auto overflow-hidden rounded-[2rem] border border-border bg-white/80 shadow-[0_20px_70px_rgba(17,17,17,0.08)] backdrop-blur-xl"
         style={{ height: containerHeight, maxWidth: containerWidth }}
       >
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,107,0,0.08),transparent_65%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,107,0,0.14),transparent_60%),linear-gradient(180deg,rgba(255,244,236,0.74),rgba(255,255,255,0.9))]"
         />
         <motion.div
           drag

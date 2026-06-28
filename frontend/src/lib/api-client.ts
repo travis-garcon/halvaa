@@ -1,5 +1,5 @@
 import { getAccessToken } from "@/lib/auth-storage";
-import type { RegisterPayload, TokenResponse, UserPublic } from "@/types/auth";
+import type { OtpStartPayload, OtpStartResponse, RegisterPayload, TokenResponse, UserPublic } from "@/types/auth";
 import type {
   ExploreFeedKind,
   ExploreMemorialFeed,
@@ -18,7 +18,7 @@ import type {
 } from "@/types/memorial";
 
 export type MemorialCreatePayload = {
-  slug: string;
+  slug?: string | null;
   birth_date?: string | null;
   death_date?: string | null;
   burial_address?: string | null;
@@ -30,6 +30,47 @@ export type MemorialCreatePayload = {
   family_tree?: Array<{ name: string; relation: string; years?: string }>;
   latitude?: number | null;
   longitude?: number | null;
+};
+
+export type StoreItemPublic = {
+  id: string;
+  key: string;
+  kind: string;
+  title: Record<string, string>;
+  description: Record<string, string>;
+  price_usd_cents: number;
+  price_irr: number;
+  item_metadata: Record<string, unknown>;
+};
+
+export type CheckoutResponse = {
+  provider: "STRIPE" | "ZARINPAL" | string;
+  purchase_id: string;
+  amount: number;
+  currency: string;
+  checkout_url: string;
+};
+
+export type AdminKpis = {
+  users: number;
+  memorials: number;
+  published_memorials: number;
+  guestbook_entries: number;
+  income_usd_cents: number;
+  income_irr: number;
+};
+
+export type ContributionPublic = {
+  id: string;
+  memorial_id: string;
+  contributor_id: string;
+  contributor_name?: string | null;
+  contribution_type: string;
+  status: string;
+  payload: Record<string, unknown>;
+  reviewer_note?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type MemorialUpdatePayload = Partial<MemorialCreatePayload> & {
@@ -125,6 +166,18 @@ export const api = {
     apiFetch<TokenResponse>("/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+
+  startOtp: (payload: OtpStartPayload) =>
+    apiFetch<OtpStartResponse>("/auth/otp/start", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  verifyOtp: (otpId: string, code: string) =>
+    apiFetch<TokenResponse>("/auth/otp/verify", {
+      method: "POST",
+      body: JSON.stringify({ otp_id: otpId, code }),
     }),
 
   me: () => apiFetch<UserPublic>("/auth/me", { auth: true }),
@@ -335,5 +388,36 @@ export const api = {
     apiFetch<GuestbookEntry>(`/memorials/${memorialId}/guestbook`, {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+
+  storeItems: () => apiFetch<StoreItemPublic[]>("/store/items"),
+
+  createCheckout: (payload: { store_item_id: string; memorial_id?: string | null; locale?: string; country_code?: string | null }) =>
+    apiFetch<CheckoutResponse>("/store/checkout", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }),
+
+  adminKpis: () => apiFetch<AdminKpis>("/admin/kpis", { auth: true }),
+
+  landingFeed: (locale = "en") =>
+    apiFetch<{ categories: Array<{ category: string; label?: string | null; items: ExploreMemorialFeed["items"] }> }>(`/explore/landing?${new URLSearchParams({ locale })}`),
+
+  createContribution: (
+    memorialId: string,
+    payload: { locale: string; name?: string | null; biography?: string | null; epitaph?: string | null; source_note?: string | null },
+  ) =>
+    apiFetch<ContributionPublic>(`/memorials/${memorialId}/contributions`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify({ contribution_type: "PROFILE_TEXT", ...payload }),
+    }),
+
+  reviewContribution: (memorialId: string, contributionId: string, decision: "APPROVE" | "REJECT", reviewer_note?: string | null) =>
+    apiFetch<ContributionPublic>(`/memorials/${memorialId}/contributions/${contributionId}`, {
+      method: "PATCH",
+      auth: true,
+      body: JSON.stringify({ decision, reviewer_note }),
     }),
 };

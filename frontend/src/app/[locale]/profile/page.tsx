@@ -15,11 +15,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   return (
     <ModernPageShell>
-      <section>
-        <div className="halvaa-container space-y-6 py-4 ltr:text-left rtl:text-right">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground sm:text-4xl">{t("title")}</h1>
-            <p className="mt-3 text-muted">{t("subtitle")}</p>
+      <section className="py-5 sm:py-8">
+        <div className="halvaa-container space-y-6 ltr:text-left rtl:text-right">
+          <div className="app-card rounded-[2rem] p-5 sm:p-8">
+            <span className="app-chip">{t("stats.memorials")}</span>
+            <h1 className="mt-4 text-4xl font-black leading-tight text-foreground sm:text-6xl">{t("title")}</h1>
+            <p className="mt-3 max-w-2xl text-muted">{t("subtitle")}</p>
           </div>
           <ProfileDashboard />
         </div>

@@ -4,6 +4,7 @@ from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.enums import UserRole
 
 if TYPE_CHECKING:
     from app.models.collaborator import MemorialCollaborator
@@ -18,6 +19,7 @@ class UserBase(SQLModel):
     avatar_url: Optional[str] = Field(default=None, max_length=2048)
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
+    role: UserRole = Field(default=UserRole.USER, index=True)
 
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, UserBase, table=True):
@@ -25,6 +27,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, UserBase, table=True):
 
     external_id: Optional[str] = Field(default=None, index=True, unique=True, max_length=255)
     hashed_password: Optional[str] = Field(default=None, max_length=255)
+    phone_number: Optional[str] = Field(default=None, index=True, max_length=32)
 
     memorials_created: list["Memorial"] = Relationship(
         back_populates="created_by",

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { ClipboardEvent, FormEvent, KeyboardEvent, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -14,72 +14,118 @@ type AuthModalProps = {
 export function AuthModal({ open, onClose }: AuthModalProps) {
   const t = useTranslations("auth");
   const locale = useLocale();
-  const { login, register, zitadelLogin } = useAuth();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const { startOtp, verifyOtp, googleLogin } = useAuth();
+  const [step, setStep] = useState<"start" | "verify">("start");
+  const [otpId, setOtpId] = useState<string | null>(null);
+  const [identifier, setIdentifier] = useState("");
+  const [code, setCode] = useState<string[]>(["", "", "", ""]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [forgotNotice, setForgotNotice] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const codeInputs = useRef<Array<HTMLInputElement | null>>([]);
 
   if (!open) return null;
 
   const resetForm = () => {
-    setEmail("");
-    setPassword("");
-    setFullName("");
+    setStep("start");
+    setOtpId(null);
+    setIdentifier("");
+    setCode(["", "", "", ""]);
     setError(null);
+    setNotice(null);
   };
 
-  const handleModeChange = (nextMode: "signin" | "signup") => {
-    setMode(nextMode);
-    setError(null);
+  const close = () => {
+    resetForm();
+    onClose();
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleStart = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
-
+    setNotice(null);
     try {
-      if (mode === "signin") {
-        await login(email.trim(), password);
-      } else {
-        await register({
-          email: email.trim(),
-          password,
-          full_name: fullName.trim(),
-          locale,
-        });
-      }
-      resetForm();
-      onClose();
+      const response = await startOtp({
+        identifier: identifier.trim(),
+        locale,
+      });
+      setOtpId(response.otp_id);
+      setStep("verify");
+      setNotice(t("otp_sent"));
+      window.setTimeout(() => codeInputs.current[0]?.focus(), 80);
     } catch (err) {
-      const message =
-        err instanceof ApiError && err.status === 401
-          ? t("error_invalid")
-          : err instanceof ApiError
-            ? err.message
-            : t("error_generic");
+      setError(err instanceof ApiError ? err.message : t("error_generic"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!otpId) return;
+    const otpCode = code.join("");
+    if (otpCode.length !== 4) {
+      setError(t("error_invalid"));
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await verifyOtp(otpId, otpCode);
+      close();
+    } catch (err) {
+      const message = err instanceof ApiError && err.status === 401 ? t("error_invalid") : err instanceof ApiError ? err.message : t("error_generic");
       setError(message);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const setCodeAt = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    setCode((current) => {
+      const next = [...current];
+      next[index] = digit;
+      return next;
+    });
+    if (digit && index < 3) {
+      codeInputs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleCodeKeyDown = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Backspace" && !code[index] && index > 0) {
+      codeInputs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleCodePaste = (event: ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4).split("");
+    if (pasted.length === 0) return;
+    const next = ["", "", "", ""];
+    pasted.forEach((digit, index) => {
+      next[index] = digit;
+    });
+    setCode(next);
+    codeInputs.current[Math.min(pasted.length, 4) - 1]?.focus();
+  };
+
   return (
     <div className="modal active modal-entrance" id="authModal">
       <div
         className="modal-overlay"
-        onClick={onClose}
-        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onClose(); }}
+        onClick={close}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") close();
+        }}
         role="button"
         tabIndex={0}
         aria-label="Close modal"
       />
       <div className="modal-content auth-modal">
-        <button type="button" className="modal-close" onClick={onClose}>
+        <button type="button" className="modal-close" onClick={close} aria-label="Close">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -90,141 +136,72 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
           <p className="auth-tagline">{t("tagline")}</p>
         </div>
 
-        <button
-          type="button"
-          className="btn-primary btn-full"
-          onClick={zitadelLogin}
-          style={{ marginBottom: "1rem" }}
-        >
-          {t("sign_in_sso")}
+        <button type="button" className="google-auth-button" onClick={googleLogin}>
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4c-.2 1.2-.9 2.3-2 3v2.5h3.2c1.9-1.8 3-4.3 3-7.3Z" />
+            <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.5L15.4 17c-.9.6-2 .9-3.4.9-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6C4.7 19.7 8.1 22 12 22Z" />
+            <path fill="#FBBC05" d="M6.4 13.8a6 6 0 0 1 0-3.6V7.6H3.1a10 10 0 0 0 0 8.8l3.3-2.6Z" />
+            <path fill="#EA4335" d="M12 6.1c1.5 0 2.8.5 3.8 1.5l2.9-2.9C17 3 14.7 2 12 2 8.1 2 4.7 4.3 3.1 7.6l3.3 2.6c.8-2.3 3-4.1 5.6-4.1Z" />
+          </svg>
+          <span>{t("sign_in_sso")}</span>
         </button>
 
         <div className="auth-divider">
           <span>{t("or_email")}</span>
         </div>
 
-        <div className="auth-tabs">
-          <button
-            type="button"
-            className={`auth-tab${mode === "signin" ? " active" : ""}`}
-            onClick={() => handleModeChange("signin")}
-          >
-            {t("sign_in")}
-          </button>
-          <button
-            type="button"
-            className={`auth-tab${mode === "signup" ? " active" : ""}`}
-            onClick={() => handleModeChange("signup")}
-          >
-            {t("sign_up")}
-          </button>
-        </div>
-
-        {mode === "signin" ? (
-          <form className="auth-form active" id="signinForm" onSubmit={handleSubmit}>
+        {step === "start" ? (
+          <form className="auth-form active" onSubmit={handleStart}>
             <div className="form-group">
-              <label htmlFor="signin-email" className="sr-only">{t("email")}</label>
+              <label htmlFor="otp-identifier" className="sr-only">{t("identifier")}</label>
               <input
-                id="signin-email"
-                type="email"
+                id="otp-identifier"
+                type="text"
                 className="form-input"
-                placeholder={t("email")}
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
+                placeholder={t("identifier")}
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                autoComplete="username"
                 required
                 disabled={submitting}
+                dir="auto"
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="signin-password" className="sr-only">{t("password")}</label>
-              <input
-                id="signin-password"
-                type="password"
-                className="form-input"
-                placeholder={t("password")}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                minLength={8}
-                required
-                disabled={submitting}
-              />
-            </div>
-            <button
-              type="button"
-              className="forgot-link cursor-pointer"
-              onClick={() => setForgotNotice(true)}
-              disabled={submitting}
-            >
-              {t("forgot_password")}
-            </button>
-            {forgotNotice && (
-              <p className="auth-notice" role="status" style={{ fontSize: "0.875rem", color: "var(--halvaa-text-muted)" }}>
-                {t("forgot_password_notice")}
-              </p>
-            )}
-            {error && (
-              <p className="auth-error feedback-error" style={{ fontSize: "0.875rem" }}>
-                {error}
-              </p>
-            )}
+            {error && <p className="auth-error feedback-error text-sm">{error}</p>}
             <button type="submit" className={"btn-primary btn-full" + (submitting ? " btn-loading" : "")} disabled={submitting}>
-              <span>{submitting ? t("signing_in") : t("sign_in")}</span>
+              <span>{submitting ? t("otp_sending") : t("otp_send")}</span>
             </button>
           </form>
         ) : (
-          <form className="auth-form active" id="signupForm" onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="signup-name" className="sr-only">{t("full_name")}</label>
-              <input
-                id="signup-name"
-                type="text"
-                className="form-input"
-                placeholder={t("full_name")}
-                value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
-                autoComplete="name"
-                required
-                disabled={submitting}
-              />
+          <form className="auth-form active" onSubmit={handleVerify}>
+            {notice && <p className="auth-notice text-sm text-muted" role="status">{notice}</p>}
+            <div className="otp-code-row" dir="ltr" aria-label={t("otp_code")}>
+              {code.map((digit, index) => (
+                <input
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={index}
+                  ref={(input) => {
+                    codeInputs.current[index] = input;
+                  }}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="otp-digit-input"
+                  value={digit}
+                  onChange={(event) => setCodeAt(index, event.target.value)}
+                  onKeyDown={(event) => handleCodeKeyDown(index, event)}
+                  onPaste={handleCodePaste}
+                  autoComplete={index === 0 ? "one-time-code" : "off"}
+                  aria-label={`${t("otp_code")} ${index + 1}`}
+                  maxLength={1}
+                  required
+                  disabled={submitting}
+                />
+              ))}
             </div>
-            <div className="form-group">
-              <label htmlFor="signup-email" className="sr-only">{t("email")}</label>
-              <input
-                id="signup-email"
-                type="email"
-                className="form-input"
-                placeholder={t("email")}
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                required
-                disabled={submitting}
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="signup-password" className="sr-only">{t("password")}</label>
-              <input
-                id="signup-password"
-                type="password"
-                className="form-input"
-                placeholder={t("password")}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="new-password"
-                minLength={8}
-                required
-                disabled={submitting}
-              />
-            </div>
-            {error && (
-              <p className="auth-error feedback-error" style={{ fontSize: "0.875rem" }}>
-                {error}
-              </p>
-            )}
+            {error && <p className="auth-error feedback-error text-sm">{error}</p>}
             <button type="submit" className={"btn-primary btn-full" + (submitting ? " btn-loading" : "")} disabled={submitting}>
-              <span>{submitting ? t("signing_up") : t("sign_up")}</span>
+              <span>{submitting ? t("otp_verifying") : t("otp_verify")}</span>
             </button>
           </form>
         )}

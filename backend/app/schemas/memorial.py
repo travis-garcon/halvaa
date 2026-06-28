@@ -11,7 +11,7 @@ from app.schemas.validators import Latitude, Longitude, SanitizedStr, SlugStr
 
 
 class MemorialCreate(BaseModel):
-    slug: SlugStr
+    slug: SlugStr | None = None
     birth_date: date | None = None
     death_date: date | None = None
     burial_address: SanitizedStr | None = Field(default=None, max_length=512)
@@ -44,6 +44,7 @@ class MemorialUpdate(BaseModel):
 
 class MemorialPublic(BaseModel):
     id: UUID
+    public_id: str
     slug: str
     status: MemorialStatus
     birth_date: date | None

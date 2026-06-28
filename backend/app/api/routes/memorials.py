@@ -1,3 +1,5 @@
+import secrets
+import string
 import uuid
 from typing import Annotated, cast
 
@@ -12,6 +14,7 @@ from app.models.guestbook import GuestbookEntry
 from app.models.media import MediaAsset
 from app.models.memorial import Memorial
 from app.models.review_event import ReviewEvent
+from app.models.store import Purchase, StoreItem
 from app.models.timeline import TimelineEvent
 from app.models.user import User
 from app.schemas.collaborator import MemorialCollaboratorInvite, MemorialCollaboratorList, MemorialCollaboratorPublic, MemorialCollaboratorUpdate
@@ -40,8 +43,43 @@ from app.services.permissions import (
     require_memorial_capability,
     resolve_effective_role,
 )
+from app.models.enums import PurchaseStatus, StoreItemKind
+from app.services.text_policy import assert_acceptable_text, assert_not_duplicate_text
 
 router = APIRouter(prefix="/memorials", tags=["memorials"])
+
+RANDOM_ID_ALPHABET = string.ascii_lowercase + string.digits
+
+
+def _generate_public_id(session: Session) -> str:
+    for _ in range(12):
+        value = "m-" + "".join(secrets.choice(RANDOM_ID_ALPHABET) for _ in range(8))
+        if session.exec(select(Memorial).where(Memorial.public_id == value)).first() is None:
+            return value
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not allocate memorial ID")
+
+
+def _has_custom_id_entitlement(session: Session, user: User) -> bool:
+    return (
+        session.exec(
+            select(Purchase)
+            .join(StoreItem, StoreItem.id == Purchase.store_item_id)
+            .where(
+                Purchase.user_id == user.id,
+                Purchase.status.in_([PurchaseStatus.PAID, PurchaseStatus.ASSIGNED]),
+                StoreItem.kind == StoreItemKind.CUSTOM_MEMORIAL_ID,
+            )
+        ).first()
+        is not None
+    )
+
+
+def _flatten_translation_text(translations: dict) -> list[str]:
+    values: list[str] = []
+    for layer in translations.values():
+        if isinstance(layer, dict):
+            values.extend(str(value) for value in layer.values() if value)
+    return values
 
 
 def _collaborator_to_public(collaborator: MemorialCollaborator, user: User) -> MemorialCollaboratorPublic:
@@ -145,12 +183,28 @@ def create_memorial(
     session: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> MemorialPublic:
-    existing = session.exec(select(Memorial).where(Memorial.slug == payload.slug)).first()
+    text_values = _flatten_translation_text(payload.translations)
+    assert_acceptable_text([*text_values, payload.burial_address, payload.burial_site_name, payload.burial_plot_name])
+    main_story = " ".join(text_values)
+    if main_story:
+        existing_stories = []
+        for row in session.exec(select(Memorial.translations)).all():
+            if isinstance(row, dict):
+                existing_stories.append(" ".join(_flatten_translation_text(row)))
+        assert_not_duplicate_text(main_story, existing_stories)
+
+    requested_slug = payload.slug
+    if requested_slug and not _has_custom_id_entitlement(session, current_user):
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Custom memorial IDs require a store purchase")
+
+    public_id = requested_slug or _generate_public_id(session)
+    existing = session.exec(select(Memorial).where(Memorial.slug == public_id)).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Slug already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Memorial ID already exists")
 
     memorial = Memorial(
-        slug=payload.slug,
+        public_id=public_id,
+        slug=public_id,
         birth_date=payload.birth_date,
         death_date=payload.death_date,
         burial_address=payload.burial_address,
@@ -161,7 +215,8 @@ def create_memorial(
         theme_overrides=payload.theme_overrides,
         family_tree=payload.family_tree,
         created_by_id=current_user.id,
-        status=MemorialStatus.DRAFT,
+        status=MemorialStatus.PUBLISHED,
+        published_at=utc_now(),
     )
     try:
         apply_coordinates(memorial, payload.latitude, payload.longitude)
@@ -175,6 +230,7 @@ def create_memorial(
             memorial_id=memorial.id,
             user_id=current_user.id,
             role=CollaboratorRole.OWNER,
+            accepted_at=utc_now(),
         )
     )
     session.commit()

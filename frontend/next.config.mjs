@@ -16,6 +16,16 @@ function apiUploadPatterns() {
       port: "8000",
       pathname: "/uploads/**",
     },
+    {
+      protocol: "https",
+      hostname: "upload.wikimedia.org",
+      pathname: "/**",
+    },
+    {
+      protocol: "https",
+      hostname: "gapgpt.cloud",
+      pathname: "/user_files/**",
+    },
   ];
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -73,6 +83,7 @@ const nextConfig = {
   async headers() {
     const allowedOrigins = [...new Set([...localMapOrigins(), ...apiOrigins()])].join(" ");
     const connectSrc = ["'self'", allowedOrigins].filter(Boolean).join(" ");
+    const imageSrc = ["'self'", allowedOrigins, "https://upload.wikimedia.org", "https://gapgpt.cloud"].filter(Boolean).join(" ");
     const assetSrc = ["'self'", allowedOrigins].filter(Boolean).join(" ");
 
     return [
@@ -92,7 +103,7 @@ const nextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src ${connectSrc}; font-src ${assetSrc}; img-src ${assetSrc} data: blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+            value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src ${connectSrc}; font-src ${assetSrc}; img-src ${imageSrc} data: blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
           },
         ],
       },

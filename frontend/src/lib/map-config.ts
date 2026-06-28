@@ -1,8 +1,12 @@
 /**
- * Map defaults are local-first. The preferred development setup is Docker
- * serving `map-data/halvaa.pmtiles` plus local Protomaps font/sprite assets.
- * Terrain is optional and can be enabled with a local Terrarium DEM PMTiles file.
- * The OpenFreeMap proxy remains as an explicit fallback only.
+ * Existing local tile system:
+ * - Docker can serve `map-data/halvaa.pmtiles` plus local Protomaps assets.
+ * - Terrain is optional with a local Terrarium DEM PMTiles file.
+ *
+ * Temporary Mapbox-style path:
+ * - Set NEXT_PUBLIC_LOCAL_MAP_ENABLED=false.
+ * - Set NEXT_PUBLIC_MAP_STYLE_URL to a Mapbox style URL that already includes
+ *   the access token, or to any compatible MapLibre style endpoint.
  */
 
 export const LOCAL_MAP_STYLE_URL = "/api/map-style";

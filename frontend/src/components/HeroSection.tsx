@@ -1,113 +1,111 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
+import useSWR from "swr";
 import { useLocale, useTranslations } from "next-intl";
 
-import { useDiscoverMemorials } from "@/hooks/use-discover-memorials";
 import { Link } from "@/i18n/routing";
+import { api } from "@/lib/api-client";
+import { HALVAA_BLUR_DATA_URL, resolveImageUrl } from "@/lib/blur";
 
-export function HeroSection() {
-  const locale = useLocale();
-  const t = useTranslations("hero");
-  const { memorials, isLoading } = useDiscoverMemorials("featured", locale, 3);
-  const featuredMemorials = memorials.slice(0, 3);
-  const heroItems = isLoading ? [null, null, null] : featuredMemorials;
+type HeroMemorialCard = {
+  id: string;
+  slug: string;
+  name: string;
+  subtitle?: string | null;
+  imageUrl?: string | null;
+};
+
+const FALLBACK_IMAGE = "https://gapgpt.cloud/user_files/44409592-55b7-40e0-82de-ae7bdbd81c81.webp";
+
+function HeroPhotoCard({ item }: { item: HeroMemorialCard }) {
+  const imageUrl = resolveImageUrl(item.imageUrl ?? undefined) ?? FALLBACK_IMAGE;
 
   return (
-    <section className="relative overflow-hidden py-20 sm:py-28">
-      <div className="hero-backlight" aria-hidden />
-
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(255,107,0,0.06),transparent_50%)]"
+    <Link href={`/memorial/${item.slug}`} className="landing-hero-card group">
+      <Image
+        src={imageUrl}
+        alt={item.name}
+        fill
+        sizes="(max-width: 768px) 42vw, 210px"
+        placeholder="blur"
+        blurDataURL={HALVAA_BLUR_DATA_URL}
+        className="object-cover transition duration-700 group-hover:scale-105"
       />
+      <span className="landing-hero-card-overlay" />
+      <span className="landing-hero-card-text">
+        <strong>{item.name}</strong>
+        {item.subtitle ? <small>{item.subtitle}</small> : null}
+      </span>
+    </Link>
+  );
+}
 
-      <div className="halvaa-container relative grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+function HeroMarqueeColumn({ items, reverse = false }: { items: HeroMemorialCard[]; reverse?: boolean }) {
+  const loopItems = [...items, ...items, ...items];
+
+  return (
+    <div className="landing-hero-marquee-column">
+      <div className={reverse ? "landing-hero-marquee-track is-reverse" : "landing-hero-marquee-track"}>
+        {loopItems.map((item, index) => (
+          <HeroPhotoCard key={`${item.id}-${index}`} item={item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function HeroSection() {
+  const t = useTranslations("hero");
+  const locale = useLocale();
+  const { data } = useSWR(["landing-hero", locale], () => api.landingFeed(locale));
+  const apiItems = data?.categories.flatMap((category) => category.items).map((item) => ({
+    id: item.id,
+    slug: item.slug,
+    name: item.name,
+    subtitle: item.burial_site_name ?? item.burial_address,
+    imageUrl: item.image_url,
+  })) ?? [];
+  const fallbackItems: HeroMemorialCard[] = [
+    { id: "fallback-1", slug: "maryam-mirzakhani", name: "Maryam Mirzakhani", subtitle: t("featured.label"), imageUrl: FALLBACK_IMAGE },
+    { id: "fallback-2", slug: "ferdowsi", name: "Ferdowsi", subtitle: t("featured.label"), imageUrl: FALLBACK_IMAGE },
+    { id: "fallback-3", slug: "parvin-etesami", name: "Parvin Etesami", subtitle: t("featured.label"), imageUrl: FALLBACK_IMAGE },
+    { id: "fallback-4", slug: "sohrab-sepehri", name: "Sohrab Sepehri", subtitle: t("featured.label"), imageUrl: FALLBACK_IMAGE },
+  ];
+  const items = (apiItems.length >= 4 ? apiItems : fallbackItems).slice(0, 8);
+  const midpoint = Math.ceil(items.length / 2);
+
+  return (
+    <section className="landing-hero">
+      <div className="landing-hero-inner">
         <motion.div
-          initial={{ opacity: 0, y: 32 }}
+          initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          className="max-w-2xl ltr:text-left rtl:text-right"
+          transition={{ duration: 0.55, ease: "easeOut" }}
+          className="landing-hero-copy"
         >
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-            className="text-4xl font-bold leading-tight text-foreground sm:text-5xl lg:text-6xl"
-          >
-            {t("title.line1")}
-            <br />
-            {t("title.line2")}
-            <br />
-            {t("title.line3")}
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.35 }}
-            className="mt-6 text-base leading-8 text-muted sm:text-lg"
-          >
-            {t("subtitle")}
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.45 }}
-            className="mt-8 flex flex-wrap gap-4 ltr:justify-start rtl:justify-end"
-          >
-            <Link href="/memorial/create" className="halvaa-btn-primary">
+          <p className="landing-hero-eyebrow">{t("featured.label")}</p>
+          <h1>
+            {t("title.line1")} <span>{t("title.line2")}</span> {t("title.line3")}
+          </h1>
+          <p>{t("subtitle")}</p>
+          <div className="landing-hero-actions">
+            <Link href="/memorial/create" className="halvaa-btn-primary min-h-12 px-6 text-sm">
               {t("btn.create")}
             </Link>
-            <Link href="/explore" className="halvaa-btn-secondary">
+            <Link href="/explore" className="halvaa-btn-secondary min-h-12 px-6 text-sm">
               {t("btn.explore")}
             </Link>
-          </motion.div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-          className="hero-glass-card rounded-3xl border border-border/60 p-8 shadow-soft ltr:text-left rtl:text-right"
-        >
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="text-sm font-medium text-primary"
-          >
-            {t("featured.label")}
-          </motion.p>
-          <div className="mt-8 grid grid-cols-3 gap-3">
-            {heroItems.map((memorial, index) => (
-              <motion.div
-                key={memorial?.id ?? `loading-${index}`}
-                initial={{ opacity: 0, y: 16, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.6, delay: 0.3 + index * 0.12, ease: "easeOut" }}
-              >
-                {!memorial ? (
-                  <div className="hero-placeholder-card aspect-[3/4] rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent" />
-                ) : (
-                  <Link
-                    href={`/memorial/${memorial.slug}`}
-                    className="group flex aspect-[3/4] flex-col justify-end rounded-2xl border border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.2),rgba(255,107,0,0.16))] p-4 shadow-soft transition-transform duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                  >
-                    <div className="mb-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/70 text-base font-semibold text-primary backdrop-blur-sm">
-                      {memorial.name.charAt(0)}
-                    </div>
-                    <div className="rounded-xl bg-white/72 p-3 backdrop-blur-sm">
-                      <p className="line-clamp-2 text-sm font-semibold text-foreground transition-colors duration-200 group-hover:text-primary">
-                        {memorial.name}
-                      </p>
-                      <p className="mt-1 text-[11px] text-muted">/{memorial.slug}</p>
-                    </div>
-                  </Link>
-                )}
-              </motion.div>
-            ))}
           </div>
         </motion.div>
+
+        <div className="landing-hero-marquee-wrap" aria-label={t("featured.pagination")}>
+          <div className="landing-hero-marquee-stage">
+            <HeroMarqueeColumn items={items.slice(0, midpoint)} />
+            <HeroMarqueeColumn items={items.slice(midpoint).length ? items.slice(midpoint) : items.slice(0, midpoint)} reverse />
+          </div>
+        </div>
       </div>
     </section>
   );

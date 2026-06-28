@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app.api.deps import get_db
 from app.models.user import User
-from lib.auth import oauth, zitadel_enabled
+from lib import auth as zitadel_auth
 from lib.config import zitadel_config
 
 logger = logging.getLogger(__name__)
@@ -25,12 +25,12 @@ def _not_implemented() -> JSONResponse:
 
 @router.get("/signin", response_model=None)
 async def signin(request: Request) -> RedirectResponse | JSONResponse:
-    if not zitadel_enabled:
+    if not zitadel_auth.zitadel_enabled:
         return _not_implemented()
     callback = request.query_params.get("callbackUrl") or "/"
     request.session["post_login_url"] = callback
     redirect_uri = zitadel_config.ZITADEL_CALLBACK_URL
-    resp = await oauth.zitadel.authorize_redirect(request, redirect_uri)
+    resp = await zitadel_auth.oauth.zitadel.authorize_redirect(request, redirect_uri)
     return cast(RedirectResponse, resp)
 
 
@@ -38,11 +38,11 @@ async def signin(request: Request) -> RedirectResponse | JSONResponse:
 async def callback(
     request: Request, db: Session = Depends(get_db)
 ) -> RedirectResponse | JSONResponse:
-    if not zitadel_enabled:
+    if not zitadel_auth.zitadel_enabled:
         return _not_implemented()
     try:
-        token = await oauth.zitadel.authorize_access_token(request)
-        userinfo = await oauth.zitadel.userinfo(token=token)
+        token = await zitadel_auth.oauth.zitadel.authorize_access_token(request)
+        userinfo = await zitadel_auth.oauth.zitadel.userinfo(token=token)
     except Exception:
         logger.exception("OAuth callback failed")
         return RedirectResponse(
@@ -95,14 +95,14 @@ async def callback(
 
 @router.post("/logout", response_model=None)
 async def logout(request: Request) -> RedirectResponse | JSONResponse:
-    if not zitadel_enabled:
+    if not zitadel_auth.zitadel_enabled:
         return _not_implemented()
     auth_session = request.session.get("auth_session")
     request.session.clear()
     id_token_hint = (
         auth_session.get("id_token") if auth_session else None
     )
-    metadata = await oauth.zitadel.load_server_metadata()
+    metadata = await zitadel_auth.oauth.zitadel.load_server_metadata()
     end_session = metadata.get("end_session_endpoint")
     if end_session and id_token_hint:
         params = {

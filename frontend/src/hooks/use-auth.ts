@@ -7,7 +7,7 @@ import { api, buildApiUrl } from "@/lib/api-client";
 import {
   setAccessToken,
 } from "@/lib/auth-storage";
-import type { RegisterPayload, UserPublic } from "@/types/auth";
+import type { OtpStartPayload, RegisterPayload, UserPublic } from "@/types/auth";
 
 const AUTH_ME_KEY = ["auth", "me"] as const;
 
@@ -17,6 +17,10 @@ export function getZitadelLoginUrl(): string {
 
 export function getZitadelLogoutUrl(): string {
   return buildApiUrl("/auth/logout");
+}
+
+export function getGoogleLoginUrl(): string {
+  return buildApiUrl("/auth/google/signin");
 }
 
 export function useAuth() {
@@ -32,6 +36,10 @@ export function useAuth() {
 
   const zitadelLogin = useCallback(() => {
     window.location.href = getZitadelLoginUrl();
+  }, []);
+
+  const googleLogin = useCallback(() => {
+    window.location.href = getGoogleLoginUrl();
   }, []);
 
   const login = useCallback(
@@ -53,6 +61,14 @@ export function useAuth() {
     [],
   );
 
+  const startOtp = useCallback((payload: OtpStartPayload) => api.startOtp(payload), []);
+
+  const verifyOtp = useCallback(async (otpId: string, code: string) => {
+    const token = await api.verifyOtp(otpId, code);
+    setAccessToken(token.access_token);
+    await globalMutate(AUTH_ME_KEY, api.me());
+  }, []);
+
   const logout = useCallback(() => {
     setAccessToken(null);
     void mutate(undefined, { revalidate: false });
@@ -66,7 +82,10 @@ export function useAuth() {
     isAuthenticated: !!user,
     login,
     register,
+    startOtp,
+    verifyOtp,
     logout,
     zitadelLogin,
+    googleLogin,
   };
 }

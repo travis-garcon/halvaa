@@ -35,6 +35,36 @@ class Settings(BaseSettings):
     rate_limit_guestbook: str = "5/minute"
     rate_limit_default: str = "120/minute"
 
+    otp_expire_minutes: int = 10
+    otp_max_attempts: int = 5
+    sms_provider: str = "kavenegar"
+    sms_api_key: str | None = None
+    sms_sender: str | None = None
+
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str = "no-reply@halvaa.app"
+    smtp_from_name: str = "Halvaa"
+    smtp_use_tls: bool = True
+    smtp_helo_domain: str = "halvaa.app"
+    smtp_direct_delivery: bool = True
+
+    stripe_secret_key: str | None = None
+    stripe_success_url: str = "http://localhost:3000/en/store?payment=success"
+    stripe_cancel_url: str = "http://localhost:3000/en/store?payment=cancel"
+    zarinpal_merchant_id: str | None = None
+    zarinpal_callback_url: str = "http://localhost:3000/fa/store?payment=verify"
+    zarinpal_sandbox: bool = True
+
+    mapbox_access_token: str | None = None
+
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_callback_url: str = "http://localhost:8000/api/v1/auth/google/callback"
+    google_post_login_url: str = "http://localhost:3000/en/profile"
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: str | list[str]) -> list[str]:

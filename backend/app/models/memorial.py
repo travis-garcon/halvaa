@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 
 class MemorialBase(SQLModel):
+    public_id: str = Field(index=True, unique=True, max_length=64)
     slug: str = Field(index=True, unique=True, max_length=128)
     status: MemorialStatus = Field(
         default=MemorialStatus.DRAFT,

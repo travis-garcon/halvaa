@@ -44,3 +44,27 @@ class MediaProcessingStatus(str, enum.Enum):
     PENDING = "PENDING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+
+
+class UserRole(str, enum.Enum):
+    USER = "USER"
+    ADMIN = "ADMIN"
+
+
+class StoreItemKind(str, enum.Enum):
+    CUSTOM_MEMORIAL_ID = "CUSTOM_MEMORIAL_ID"
+    FEATURED_PLACEMENT = "FEATURED_PLACEMENT"
+    EXTRA_MEMORIAL_SLOT = "EXTRA_MEMORIAL_SLOT"
+    THEME_PACK = "THEME_PACK"
+
+
+class PurchaseStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    PAID = "PAID"
+    ASSIGNED = "ASSIGNED"
+    CANCELED = "CANCELED"
+
+
+class PaymentProvider(str, enum.Enum):
+    STRIPE = "STRIPE"
+    ZARINPAL = "ZARINPAL"
