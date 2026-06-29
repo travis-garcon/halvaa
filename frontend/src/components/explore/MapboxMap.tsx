@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_COORDINATES } from "@/hooks/use-geolocation";
 import { isDemoFallbackEnabled } from "@/lib/demo-mode";
 import { getSampleGridMemorials } from "@/lib/explore-data";
-import { getFallbackMapStyleUrl, getLocalMapConfig, getMapStyleUrl, type LocalMapConfig } from "@/lib/map-config";
+import { MAPBOX_ACCESS_TOKEN, getFallbackMapStyleUrl, getLocalMapConfig, getMapStyleUrl, type LocalMapConfig } from "@/lib/map-config";
 import type { GeoJSONFeatureCollection } from "@/types/memorial";
 import type { GeoJSONSource, LayerSpecification, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 
@@ -153,6 +153,16 @@ function formatDistance(meters: number, locale: string): string {
   return `${formatter.format(Math.round(meters))} ${locale === "fa" ? "متر" : "m"}`;
 }
 
+function withMapboxToken(url: string): string {
+  if (!url.includes("mapbox.com") || url.includes("access_token=")) {
+    return url;
+  }
+  if (!MAPBOX_ACCESS_TOKEN) {
+    return url;
+  }
+  return `${url}${url.includes("?") ? "&" : "?"}access_token=${MAPBOX_ACCESS_TOKEN}`;
+}
+
 export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps) {
   const t = useTranslations("explore");
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -245,6 +255,7 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
         pitch: 45,
         maxPitch: 75,
         attributionControl: false,
+        transformRequest: (url) => ({ url: withMapboxToken(url) }),
       });
 
       map.addControl(new maplibregl.NavigationControl(), locale === "fa" || locale === "ar" ? "top-left" : "top-right");

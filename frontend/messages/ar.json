@@ -54,6 +54,7 @@
   },
   "auth": {
     "sign_in_sso": "التسجيل باستخدام Google",
+    "sign_in_sso_soon": "التسجيل باستخدام Google",
     "or_email": "أو تابع برمز لمرة واحدة",
     "sign_in": "دخول",
     "sign_up": "إنشاء حساب",

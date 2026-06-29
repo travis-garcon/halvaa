@@ -6,7 +6,7 @@ import socket
 import struct
 from datetime import timedelta
 from email.message import EmailMessage
-from email.utils import formataddr
+from email.utils import formataddr, make_msgid
 
 import httpx
 
@@ -40,6 +40,10 @@ def _build_email_message(*, email: str, code: str) -> EmailMessage:
     email_message["Subject"] = "Your Halvaa verification code"
     email_message["From"] = formataddr((settings.smtp_from_name, settings.smtp_from_email))
     email_message["To"] = email
+    email_message["Date"] = utc_now().strftime("%a, %d %b %Y %H:%M:%S +0000")
+    email_message["Message-ID"] = make_msgid(domain=settings.smtp_helo_domain)
+    email_message["Auto-Submitted"] = "auto-generated"
+    email_message["X-Auto-Response-Suppress"] = "All"
     email_message.set_content(
         f"Your Halvaa verification code is {code}.\n\nThis code expires in {settings.otp_expire_minutes} minutes.",
     )

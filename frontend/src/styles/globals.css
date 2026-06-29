@@ -226,7 +226,7 @@ html[dir="rtl"] .landing-hero-inner {
   max-width: 11ch;
   color: #111;
   font-family: var(--font-display);
-  font-size: clamp(3.4rem, 8.4vw, 7.3rem);
+  font-size: 60px;
   font-weight: 400;
   letter-spacing: 0;
   line-height: 0.9;
@@ -254,8 +254,6 @@ html[dir="rtl"] .landing-hero-inner {
 .landing-hero-marquee-wrap {
   height: min(78vh, 45rem);
   min-height: 32rem;
-  perspective: 1100px;
-  transform-style: preserve-3d;
 }
 
 .landing-hero-marquee-stage {
@@ -264,14 +262,12 @@ html[dir="rtl"] .landing-hero-inner {
   gap: clamp(0.8rem, 1.6vw, 1.2rem);
   height: 100%;
   overflow: hidden;
-  transform: rotateX(58deg) rotateZ(-8deg) translateY(-2%);
-  transform-origin: center;
   mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
 }
 
 html[dir="rtl"] .landing-hero-marquee-stage {
-  transform: rotateX(58deg) rotateZ(8deg) translateY(-2%);
+  direction: rtl;
 }
 
 .landing-hero-marquee-column {
@@ -372,13 +368,16 @@ html[dir="rtl"] .landing-hero-marquee-stage {
 
 .landing-scroll-media {
   position: sticky;
-  top: 18vh;
+  top: 0;
   z-index: 1;
-  width: min(34vw, 28rem);
-  aspect-ratio: 4 / 5;
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  height: 100svh;
+  aspect-ratio: auto;
   margin: 0 auto;
   overflow: hidden;
-  border-radius: 1.4rem;
+  border-radius: 0;
   background: #f4f4f5;
   box-shadow: 0 30px 80px rgba(17, 17, 17, 0.12);
   animation: landing-media-frame linear both;
@@ -486,13 +485,17 @@ html[dir="rtl"] .landing-story-panel.is-right {
 }
 
 @media (max-width: 640px) {
+  .modal {
+    padding: 1rem !important;
+  }
+
   .modal.active {
     padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
     align-items: center;
   }
 
   .modal-content.auth-modal {
-    width: min(100% - 1.25rem, 27rem);
+    width: min(calc(100vw - 2rem), 27rem);
     margin: 0 auto;
     border-radius: 1.25rem;
   }
@@ -541,11 +544,11 @@ html[dir="rtl"] .landing-story-panel.is-right {
   }
 
   .landing-hero-marquee-stage {
-    transform: rotateX(56deg) rotateZ(-7deg) translateY(-6%);
+    transform: none;
   }
 
   html[dir="rtl"] .landing-hero-marquee-stage {
-    transform: rotateX(56deg) rotateZ(7deg) translateY(-6%);
+    transform: none;
   }
 
   .landing-scroll-track {
@@ -553,8 +556,8 @@ html[dir="rtl"] .landing-story-panel.is-right {
   }
 
   .landing-scroll-media {
-    width: min(72vw, 22rem);
-    top: 16vh;
+    width: 100vw;
+    top: 0;
   }
 
   .landing-scroll-copy {
@@ -585,7 +588,16 @@ html[dir="rtl"] .landing-story-panel.is-right {
   }
 
   .landing-hero-actions {
-    display: grid;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.55rem;
+  }
+
+  .landing-hero-actions a {
+    min-width: 0;
+    flex: 1 1 0;
+    padding-inline: 0.75rem;
+    font-size: 0.78rem;
   }
 
   .landing-hero-eyebrow {

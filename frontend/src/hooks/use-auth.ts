@@ -20,7 +20,7 @@ export function getZitadelLogoutUrl(): string {
 }
 
 export function getGoogleLoginUrl(): string {
-  return buildApiUrl("/auth/google/signin");
+  return process.env.NEXT_PUBLIC_GOOGLE_AUTH_URL ?? "";
 }
 
 export function useAuth() {
@@ -39,7 +39,10 @@ export function useAuth() {
   }, []);
 
   const googleLogin = useCallback(() => {
-    window.location.href = getGoogleLoginUrl();
+    const url = getGoogleLoginUrl();
+    if (url) {
+      window.location.href = url;
+    }
   }, []);
 
   const login = useCallback(

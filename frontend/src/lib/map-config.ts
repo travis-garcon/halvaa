@@ -10,7 +10,9 @@
  */
 
 export const LOCAL_MAP_STYLE_URL = "/api/map-style";
-export const DEFAULT_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+export const TEMP_MAPBOX_TOKEN = "pk.eyJ1IjoiYWxpcHViIiwiYSI6ImNrdnpham9odjEwYXYydmxjbjE0bjc3bXQifQ.AwvrtljsjswkpklapUsDTw";
+export const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || TEMP_MAPBOX_TOKEN;
+export const DEFAULT_MAP_STYLE_URL = `https://api.mapbox.com/styles/v1/mapbox/light-v11?access_token=${MAPBOX_ACCESS_TOKEN}`;
 
 export type LocalMapConfig = {
   enabled: boolean;
@@ -21,7 +23,7 @@ export type LocalMapConfig = {
 
 export function getLocalMapConfig(): LocalMapConfig {
   return {
-    enabled: process.env.NEXT_PUBLIC_LOCAL_MAP_ENABLED !== "false",
+    enabled: process.env.NEXT_PUBLIC_LOCAL_MAP_ENABLED === "true",
     pmtilesUrl: process.env.NEXT_PUBLIC_LOCAL_MAP_PM_TILES_URL?.trim() || "http://localhost:8081/halvaa.pmtiles",
     assetsUrl: process.env.NEXT_PUBLIC_LOCAL_MAP_ASSETS_URL?.trim() || "http://localhost:8081/assets/basemaps-assets-main",
     terrainPmtilesUrl: process.env.NEXT_PUBLIC_LOCAL_MAP_TERRAIN_PM_TILES_URL?.trim() || null,
@@ -40,7 +42,7 @@ export function getMapStyleUrl(): string | null {
   if (configured) {
     return configured.trim();
   }
-  return LOCAL_MAP_STYLE_URL;
+  return DEFAULT_MAP_STYLE_URL;
 }
 
 export function getFallbackMapStyleUrl(): string {
@@ -48,5 +50,5 @@ export function getFallbackMapStyleUrl(): string {
   if (configured && configured.trim() !== "") {
     return configured.trim();
   }
-  return LOCAL_MAP_STYLE_URL;
+  return DEFAULT_MAP_STYLE_URL;
 }

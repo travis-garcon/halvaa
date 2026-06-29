@@ -52,6 +52,18 @@ export function LandingMemorialShowcase() {
   const { data, isLoading } = useSWR(["landing", locale], () => api.landingFeed(locale));
   const categories = data?.categories ?? [];
   const rtl = locale === "fa" || locale === "ar";
+  const fallbackCategory = { category: "empty", label: t("remembered_today"), items: [] };
+  const sourceCategories = categories.length ? categories : [fallbackCategory];
+  const showcaseRows = sourceCategories.length > 1
+    ? sourceCategories
+    : [
+        sourceCategories[0],
+        {
+          ...sourceCategories[0],
+          category: `${sourceCategories[0].category}-legacy`,
+          label: t("loving_memory"),
+        },
+      ];
 
   return (
     <section className="relative overflow-hidden py-8 sm:py-14">
@@ -63,12 +75,12 @@ export function LandingMemorialShowcase() {
       </div>
 
       <div className="halvaa-container mt-10 space-y-12">
-        {(categories.length ? categories : [{ category: "empty", label: t("remembered_today"), items: [] }]).map((category) => (
+        {showcaseRows.map((category) => (
           <motion.div key={category.category} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.45 }} className="space-y-5 ltr:text-left rtl:text-right">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">{category.label ?? category.category}</p>
-                <h2 className="mt-2 text-2xl font-black leading-tight text-foreground sm:text-4xl">{t("remembered_today")}</h2>
+                <h2 className="mt-2 text-2xl font-black leading-tight text-foreground sm:text-4xl">{category.label ?? t("remembered_today")}</h2>
               </div>
               <Link href="/explore" className="halvaa-btn-secondary hidden sm:inline-flex">{t("see_all")}</Link>
             </div>

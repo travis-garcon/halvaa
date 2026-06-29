@@ -1,4 +1,5 @@
 from typing import Annotated
+import logging
 import re
 from urllib.parse import urlencode
 
@@ -28,6 +29,7 @@ from app.services.otp import OtpDeliveryError, generate_otp_code, hash_otp_code,
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def _normalize_otp_identifier(payload: OtpStartRequest) -> tuple[str, str | None]:
@@ -101,9 +103,10 @@ async def start_otp(
         delivery_provider = await send_otp_message(email=email, code=code, phone_number=otp.phone_number)
     except OtpDeliveryError as exc:
         session.rollback()
+        logger.warning("OTP delivery failed for %s: %s", email, exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Could not send verification code: {exc}",
+            detail="Could not send verification code. Email or SMS delivery is not configured correctly.",
         ) from exc
     otp.sms_provider = delivery_provider
     session.add(otp)

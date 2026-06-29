@@ -26,6 +26,21 @@ function apiUploadPatterns() {
       hostname: "gapgpt.cloud",
       pathname: "/user_files/**",
     },
+    {
+      protocol: "https",
+      hostname: "api.mapbox.com",
+      pathname: "/**",
+    },
+    {
+      protocol: "https",
+      hostname: "tiles.mapbox.com",
+      pathname: "/**",
+    },
+    {
+      protocol: "https",
+      hostname: "*.tiles.mapbox.com",
+      pathname: "/**",
+    },
   ];
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -51,6 +66,9 @@ function localMapOrigins() {
     process.env.NEXT_PUBLIC_LOCAL_MAP_PM_TILES_URL || "http://localhost:8081/halvaa.pmtiles",
     process.env.NEXT_PUBLIC_LOCAL_MAP_ASSETS_URL || "http://localhost:8081/assets/basemaps-assets-main",
     process.env.NEXT_PUBLIC_LOCAL_MAP_TERRAIN_PM_TILES_URL,
+    "https://api.mapbox.com",
+    "https://events.mapbox.com",
+    "https://tiles.mapbox.com",
   ].filter(Boolean);
 
   return originsFromUrls(urls);
@@ -83,7 +101,7 @@ const nextConfig = {
   async headers() {
     const allowedOrigins = [...new Set([...localMapOrigins(), ...apiOrigins()])].join(" ");
     const connectSrc = ["'self'", allowedOrigins].filter(Boolean).join(" ");
-    const imageSrc = ["'self'", allowedOrigins, "https://upload.wikimedia.org", "https://gapgpt.cloud"].filter(Boolean).join(" ");
+    const imageSrc = ["'self'", allowedOrigins, "https://upload.wikimedia.org", "https://gapgpt.cloud", "https://api.mapbox.com", "https://tiles.mapbox.com", "https://*.tiles.mapbox.com"].filter(Boolean).join(" ");
     const assetSrc = ["'self'", allowedOrigins].filter(Boolean).join(" ");
 
     return [

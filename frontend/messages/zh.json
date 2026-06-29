@@ -54,6 +54,7 @@
   },
   "auth": {
     "sign_in_sso": "使用 Google 注册",
+    "sign_in_sso_soon": "使用 Google 注册",
     "or_email": "或使用一次性验证码继续",
     "sign_in": "登录",
     "sign_up": "注册",

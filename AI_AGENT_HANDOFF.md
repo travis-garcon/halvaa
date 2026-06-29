@@ -258,7 +258,7 @@ Frontend UI rebuild pass on 2026-06-27:
 Landing/PWA pass on 2026-06-28:
 - Rebuilt landing hero as a 100vw/100vh light-gray split section.
 - Hero text/CTA side switches naturally with RTL/LTR direction.
-- Hero media side uses two vertical infinite-loop photo-card marquee columns, one up and one down, with CSS-only bird-eye 3D transform and top/bottom CSS mask fade.
+- Hero media side uses two vertical infinite-loop photo-card marquee columns, one up and one down, with top/bottom CSS mask fade. The earlier bird-eye transform was removed per user request.
 - Added `LandingScrollStory` section with centered sticky media placeholder and alternating left/right value paragraphs within a 1200px layout.
 - Added a distinct display title font using existing `DMSerifDisplay-Regular.ttf`; RTL title fonts fall back to the existing Persian/Arabic stack.
 - Tightened mobile sizing and auth modal safe-area margins.
@@ -337,3 +337,37 @@ Do not revert these.
 - The text policy is intentionally lightweight. For production, replace or supplement it with a stronger moderation service that works within the deployment jurisdiction.
 - External seeded image URLs depend on upstream availability and licensing. Consider downloading licensed assets into controlled storage for production.
 - `Memorial.public_id` and `slug` currently mirror each other for routing compatibility.
+
+## 2026-06-29 Follow-Up Checklist
+
+Done in this pass:
+- Restored `frontend/public/assets/img/tree.png` from GitHub and made the sticky story section use it as a full-viewport cover image.
+- Set the landing hero desktop title to `60px`.
+- Removed transform/perspective styling from the hero marquee container.
+- Kept mobile hero CTA buttons inline.
+- Changed language switching to a `<select>` input.
+- Tightened mobile auth modal padding and safe-area margins.
+- Changed Google auth UI to a disabled "coming soon" path unless `NEXT_PUBLIC_GOOGLE_AUTH_URL` is configured.
+- Duplicated the landing memorial showcase row when the admin landing feed only returns one category; if admins configure multiple categories through the landing-placement API, the frontend renders all returned categories.
+- Temporarily disabled the local PMTiles map by default and wired Mapbox light style with the provided public token through `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`.
+- Added Mapbox hosts to Next image remote patterns and CSP `connect-src`/`img-src`.
+- Kept comments in `frontend/src/lib/map-config.ts` explaining the existing local tile system and the temporary Mapbox path.
+- Added RFC mail headers to OTP email and changed OTP delivery failures to log detailed server errors while returning a clean 503 message to the frontend.
+
+Verification in this pass:
+- `python3 -m compileall backend/app` passed.
+- `npm run typecheck` passed.
+- Locale JSON parse check for `en`, `fa`, `ar`, and `zh` passed.
+- `docker compose -f docker-compose.prod.yml up -d --build --no-deps backend frontend` passed.
+- `halvaa-backend-1` and `halvaa-frontend-1` are healthy.
+- `GET http://localhost:8000/health` returns `{"status":"ok"}`.
+- `HEAD http://localhost:3000/en` and `HEAD http://localhost:3000/fa` return HTTP 200.
+- `HEAD http://localhost:3000/assets/img/tree.png` returns HTTP 200.
+- CSP on `http://localhost:3000/en` includes `https://api.mapbox.com`, `https://events.mapbox.com`, and `https://tiles.mapbox.com`.
+- `GET http://localhost:8000/api/v1/explore/landing?locale=en` returns admin-selected landing categories.
+- `POST http://localhost:8000/api/v1/auth/otp/start` returns HTTP 503 with the clean frontend-safe message when direct Gmail delivery is rejected.
+
+Current OTP delivery state:
+- Backend OTP service is implemented and attempts server-side email delivery.
+- Direct SMTP from this VPS is rejected by Gmail unless `halvaa.app` mail DNS is configured correctly. Latest Gmail errors mention SPF/DKIM failure for `halvaa.app` with IP `46.249.101.229` and missing/mismatched PTR. The known required production fixes are reverse DNS/PTR for `46.249.101.229`, SPF allowing the sending IP or relay, DKIM signing, and DMARC.
+- Practical alternative: set real SMTP relay credentials in `backend/.env.production` (`SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, etc.) and set `SMTP_DIRECT_DELIVERY=false` if the relay should be mandatory.

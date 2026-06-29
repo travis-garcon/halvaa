@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { HALVAA_BLUR_DATA_URL } from "@/lib/blur";
 
-const STORY_IMAGE = "https://gapgpt.cloud/user_files/44409592-55b7-40e0-82de-ae7bdbd81c81.webp";
+const STORY_IMAGE = "/assets/img/tree.png";
 
 export function LandingScrollStory() {
   const t = useTranslations("landingStory");
@@ -20,7 +20,7 @@ export function LandingScrollStory() {
             src={STORY_IMAGE}
             alt=""
             fill
-            sizes="(max-width: 768px) 72vw, 430px"
+            sizes="100vw"
             placeholder="blur"
             blurDataURL={HALVAA_BLUR_DATA_URL}
             className="object-cover"
