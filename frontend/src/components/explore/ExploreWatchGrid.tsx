@@ -1,15 +1,19 @@
 "use client";
 
-import { motion, useMotionValue, useTransform } from "framer-motion";
+import { motion, useMotionValue, useMotionValueEvent } from "framer-motion";
 import { useTranslations } from "next-intl";
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MemorialImage } from "@/components/ui/MemorialImage";
+import { MemorialBadge } from "@/components/ui/MemorialBadge";
 import { Link } from "@/i18n/routing";
 import type { GridMemorial } from "@/types/memorial";
 
-const CELL = 92;
-const GAP = 18;
+const BUBBLE_MEDIA_SIZE = 112;
+const CELL = 148;
+const GAP = 24;
+const REPEAT_COLUMNS = 3;
+const REPEAT_ROWS = 3;
 
 type GridPosition = {
   memorial: GridMemorial;
@@ -17,82 +21,100 @@ type GridPosition = {
   y: number;
 };
 
+type GridLayout = {
+  positions: GridPosition[];
+  tileWidth: number;
+  tileHeight: number;
+};
+
 type ExploreWatchGridProps = {
   memorials: GridMemorial[];
 };
 
-function buildHoneycombPositions(memorials: GridMemorial[]): GridPosition[] {
-  const columns = Math.ceil(Math.sqrt(memorials.length * 1.2));
-  return memorials.map((memorial, index) => {
+function fillVisibleMemorials(memorials: GridMemorial[], minimumCount: number): GridMemorial[] {
+  if (memorials.length === 0 || memorials.length >= minimumCount) {
+    return memorials;
+  }
+  return Array.from({ length: minimumCount }, (_, index) => memorials[index % memorials.length]);
+}
+
+function buildHoneycombLayout(memorials: GridMemorial[], minimumCount: number): GridLayout {
+  const filledMemorials = fillVisibleMemorials(memorials, minimumCount);
+  const columns = Math.max(3, Math.ceil(Math.sqrt(filledMemorials.length * 1.15)));
+  const basePositions = filledMemorials.map((memorial, index) => {
     const row = Math.floor(index / columns);
     const col = index % columns;
     const offsetX = row % 2 === 0 ? 0 : (CELL + GAP) / 2;
     return {
       memorial,
       x: col * (CELL + GAP) + offsetX,
-      y: row * (CELL + GAP * 0.86),
+      y: row * (CELL * 0.9 + GAP),
     };
   });
+  const baseWidth = Math.max(...basePositions.map((item) => item.x), 0) + CELL + GAP * 3;
+  const baseHeight = Math.max(...basePositions.map((item) => item.y), 0) + CELL + GAP * 4;
+
+  return {
+    positions: Array.from({ length: REPEAT_COLUMNS * REPEAT_ROWS }).flatMap((_, repeatIndex) => {
+      const repeatCol = repeatIndex % REPEAT_COLUMNS;
+      const repeatRow = Math.floor(repeatIndex / REPEAT_COLUMNS);
+      return basePositions.map((position) => ({
+        memorial: position.memorial,
+        x: position.x + repeatCol * baseWidth,
+        y: position.y + repeatRow * baseHeight,
+      }));
+    }),
+    tileWidth: baseWidth,
+    tileHeight: baseHeight,
+  };
+}
+
+function wrappedOffset(value: number, origin: number, span: number): number {
+  if (!span) return value;
+  if (value > origin + span) return value - span;
+  if (value < origin - span) return value + span;
+  return value;
 }
 
 type WatchGridBubbleProps = {
   position: GridPosition;
-  offsetX: ReturnType<typeof useMotionValue<number>>;
-  offsetY: ReturnType<typeof useMotionValue<number>>;
-  containerWidth: number;
-  containerHeight: number;
 };
 
-function WatchGridBubble({
-  position,
-  offsetX,
-  offsetY,
-  containerWidth,
-  containerHeight,
-}: WatchGridBubbleProps) {
-  const scale = useTransform([offsetX, offsetY], ([latestX, latestY]) => {
-    const x = latestX as number;
-    const y = latestY as number;
-    const centerX = containerWidth / 2;
-    const centerY = containerHeight / 2;
-    const itemCenterX = position.x + CELL / 2 + x;
-    const itemCenterY = position.y + CELL / 2 + y;
-    const distance = Math.hypot(itemCenterX - centerX, itemCenterY - centerY);
-    return Math.max(0.62, Math.min(1.18, 1.22 - distance / 280));
-  });
-
-  const zIndex = useTransform(scale, (value) => Math.round(value * 100));
-
+function WatchGridBubble({ position }: WatchGridBubbleProps) {
   return (
-    <motion.div
+    <div
       style={{
-        x: position.x,
-        y: position.y,
-        scale,
-        zIndex,
+        left: position.x,
+        top: position.y,
         width: CELL,
         height: CELL,
       }}
       className="absolute"
-      whileTap={{ scale: 0.94 }}
     >
       <Link
         href={`/memorial/${position.memorial.slug}`}
-        className="group flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
+        className="explore-watch-bubble group flex h-full w-full cursor-pointer flex-col items-center justify-start gap-2 rounded-full px-2 pt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
       >
-        <div className="overflow-hidden rounded-full border-2 border-white shadow-soft transition group-hover:border-primary">
+        <div className="explore-watch-bubble-media relative overflow-hidden rounded-full border border-white/50">
           <MemorialImage
             src={position.memorial.imageUrl}
             alt={position.memorial.name}
-            size={72}
+            size={BUBBLE_MEDIA_SIZE}
             fallbackLetter={position.memorial.name.charAt(0)}
+            className="rounded-full"
+          />
+          <MemorialBadge
+            status={position.memorial.status}
+            isVerified={position.memorial.isVerified}
+            viewCount={position.memorial.viewCount}
+            className="absolute bottom-1 end-1"
           />
         </div>
-        <span className="max-w-[88px] truncate text-center text-[11px] font-medium text-foreground">
+        <span className="max-w-[104px] truncate text-center text-[11px] font-black tracking-[0.02em] text-white">
           {position.memorial.name}
         </span>
       </Link>
-    </motion.div>
+    </div>
   );
 }
 
@@ -100,15 +122,15 @@ export function ExploreWatchGrid({ memorials }: ExploreWatchGridProps) {
   const t = useTranslations("explore");
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(360);
-  const containerHeight = Math.min(containerWidth * 1.17, 500);
+  const containerHeight = Math.max(560, Math.min(containerWidth * 1.7, 860));
 
   useEffect(() => {
     const updateWidth = () => {
       if (containerRef.current) {
         const parent = containerRef.current.parentElement;
         if (parent) {
-          const width = Math.min(parent.clientWidth - 4, 480);
-          setContainerWidth(Math.max(width, 280));
+          const width = parent.clientWidth;
+          setContainerWidth(Math.max(width, 300));
         }
       }
     };
@@ -117,48 +139,63 @@ export function ExploreWatchGrid({ memorials }: ExploreWatchGridProps) {
     return () => window.removeEventListener("resize", updateWidth);
   }, []);
 
-  const positions = useMemo(() => buildHoneycombPositions(memorials), [memorials]);
+  const minimumVisualCells = useMemo(() => {
+    const columns = Math.ceil(containerWidth / (CELL + GAP));
+    const rows = Math.ceil(containerHeight / (CELL * 0.9 + GAP));
+    return Math.max(memorials.length, columns * rows + columns * 2);
+  }, [containerHeight, containerWidth, memorials.length]);
+  const layout = useMemo(() => buildHoneycombLayout(memorials, minimumVisualCells), [memorials, minimumVisualCells]);
+  const positions = layout.positions;
 
   const gridWidth = useMemo(() => {
     if (memorials.length === 0) return 0;
     const maxX = Math.max(...positions.map((item) => item.x), 0);
-    return maxX + CELL + GAP;
+    return maxX + CELL + GAP * 2;
   }, [memorials.length, positions]);
 
   const gridHeight = useMemo(() => {
     if (memorials.length === 0) return 0;
     const maxY = Math.max(...positions.map((item) => item.y), 0);
-    return maxY + CELL + GAP;
+    return maxY + CELL + GAP * 3;
   }, [memorials.length, positions]);
 
-  const offsetX = useMotionValue(Math.max((containerWidth - gridWidth) / 2, 8));
-  const offsetY = useMotionValue(Math.max((containerHeight - gridHeight) / 2, 8));
+  const offsetX = useMotionValue((containerWidth - gridWidth) / 2);
+  const offsetY = useMotionValue((containerHeight - gridHeight) / 2);
+  const originX = (containerWidth - gridWidth) / 2;
+  const originY = (containerHeight - gridHeight) / 2;
+
+  useEffect(() => {
+    offsetX.set(originX);
+    offsetY.set(originY);
+  }, [offsetX, offsetY, originX, originY]);
+
+  useMotionValueEvent(offsetX, "change", (latest) => {
+    const next = wrappedOffset(latest, originX, layout.tileWidth);
+    if (next !== latest) offsetX.set(next);
+  });
+
+  useMotionValueEvent(offsetY, "change", (latest) => {
+    const next = wrappedOffset(latest, originY, layout.tileHeight);
+    if (next !== latest) offsetY.set(next);
+  });
 
   if (memorials.length === 0) {
     return (
-      <div className="flex h-[420px] items-center justify-center rounded-[2rem] border border-border px-6 text-center text-sm text-muted">
+      <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/68">
         {t("emptyGrid")}
       </div>
     );
   }
 
   return (
-    <div className="page-entrance w-full ltr:text-left rtl:text-right">
-      <p className="mb-3 text-xs font-semibold text-muted sm:text-sm">{t("gridHint")}</p>
-      <div
-        ref={containerRef}
-        className="relative mx-auto overflow-hidden rounded-[2rem] border border-border bg-white/80 shadow-[0_20px_70px_rgba(17,17,17,0.08)] backdrop-blur-xl"
-        style={{ height: containerHeight, maxWidth: containerWidth }}
-      >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,107,0,0.14),transparent_60%),linear-gradient(180deg,rgba(255,244,236,0.74),rgba(255,255,255,0.9))]"
-        />
+    <div className="explore-watch-grid-shell page-entrance w-full text-left" dir="ltr">
+      <div ref={containerRef} className="explore-watch-grid-canvas relative h-full w-full overflow-hidden">
+        <div aria-hidden className="explore-watch-grid-glow" />
         <motion.div
           drag
-          dragMomentum={false}
-          dragElastic={0.08}
-          dragConstraints={containerRef}
+          dragMomentum
+          dragElastic={0.22}
+          dragTransition={{ power: 0.22, timeConstant: 650, modifyTarget: (target) => target }}
           style={{
             width: gridWidth,
             height: gridHeight,
@@ -168,21 +205,15 @@ export function ExploreWatchGrid({ memorials }: ExploreWatchGridProps) {
           }}
           className="absolute cursor-grab active:cursor-grabbing"
         >
-          {positions.map((position) => (
+          {positions.map((position, index) => (
             <WatchGridBubble
-              key={position.memorial.id}
+              key={`${position.memorial.id}-${index}`}
               position={position}
-              offsetX={offsetX}
-              offsetY={offsetY}
-              containerWidth={containerWidth}
-              containerHeight={containerHeight}
             />
           ))}
         </motion.div>
       </div>
-      <p className="mt-3 text-center text-xs text-muted">
-        {t("gridCount", { count: memorials.length })}
-      </p>
+      <p className="explore-watch-grid-count">{t("gridCount", { count: memorials.length })}</p>
     </div>
   );
 }

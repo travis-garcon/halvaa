@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import useSWR from "swr";
 import { useLocale, useTranslations } from "next-intl";
 
+import { MemorialSearchCTA } from "@/components/MemorialSearchCTA";
+import { MemorialBadge } from "@/components/ui/MemorialBadge";
 import { Link } from "@/i18n/routing";
 import { api } from "@/lib/api-client";
 import { HALVAA_BLUR_DATA_URL, resolveImageUrl } from "@/lib/blur";
@@ -15,9 +17,28 @@ type HeroMemorialCard = {
   name: string;
   subtitle?: string | null;
   imageUrl?: string | null;
+  status?: "PUBLISHED" | "FEATURED";
+  isVerified?: boolean;
+  viewCount?: number;
 };
 
 const FALLBACK_IMAGE = "https://gapgpt.cloud/user_files/44409592-55b7-40e0-82de-ae7bdbd81c81.webp";
+const PRIORITY_MEMORIALS: HeroMemorialCard[] = [
+  {
+    id: "priority-maryam-mirzakhani",
+    slug: "maryam-mirzakhani",
+    name: "Maryam Mirzakhani",
+    subtitle: "Mathematician",
+    imageUrl: "/images/Maryam_Mirzakhani-MAIN.jpg",
+  },
+  {
+    id: "priority-mahmoud-hesabi",
+    slug: "mahmoud-hesabi",
+    name: "Dr. Hessani",
+    subtitle: "Scientist",
+    imageUrl: "/images/Mahmoud_Hesabi.png",
+  },
+];
 
 function HeroPhotoCard({ item }: { item: HeroMemorialCard }) {
   const imageUrl = resolveImageUrl(item.imageUrl ?? undefined) ?? FALLBACK_IMAGE;
@@ -35,7 +56,7 @@ function HeroPhotoCard({ item }: { item: HeroMemorialCard }) {
       />
       <span className="landing-hero-card-overlay" />
       <span className="landing-hero-card-text">
-        <strong>{item.name}</strong>
+        <span className="flex items-center gap-1.5"><strong>{item.name}</strong><MemorialBadge status={item.status} isVerified={item.isVerified} viewCount={item.viewCount} /></span>
         {item.subtitle ? <small>{item.subtitle}</small> : null}
       </span>
     </Link>
@@ -43,7 +64,7 @@ function HeroPhotoCard({ item }: { item: HeroMemorialCard }) {
 }
 
 function HeroMarqueeColumn({ items, reverse = false }: { items: HeroMemorialCard[]; reverse?: boolean }) {
-  const loopItems = [...items, ...items, ...items];
+  const loopItems = items.length > 2 ? [...items, ...items] : items;
 
   return (
     <div className="landing-hero-marquee-column">
@@ -60,20 +81,33 @@ export function HeroSection() {
   const t = useTranslations("hero");
   const locale = useLocale();
   const { data } = useSWR(["landing-hero", locale], () => api.landingFeed(locale));
-  const apiItems = data?.categories.flatMap((category) => category.items).map((item) => ({
-    id: item.id,
-    slug: item.slug,
-    name: item.name,
-    subtitle: item.burial_site_name ?? item.burial_address,
-    imageUrl: item.image_url,
-  })) ?? [];
+  const apiItems: HeroMemorialCard[] =
+    data?.categories.flatMap((category) => category.items).map((item) => ({
+      id: item.id,
+      slug: item.slug,
+      name: item.name,
+      subtitle: item.burial_site_name ?? item.burial_address ?? null,
+      imageUrl: item.image_url ?? null,
+      status: item.status === "FEATURED" ? "FEATURED" : "PUBLISHED",
+      isVerified: item.is_verified,
+      viewCount: item.view_count,
+    })) ?? [];
   const fallbackItems: HeroMemorialCard[] = [
-    { id: "fallback-1", slug: "maryam-mirzakhani", name: "Maryam Mirzakhani", subtitle: t("featured.label"), imageUrl: FALLBACK_IMAGE },
+    ...PRIORITY_MEMORIALS,
     { id: "fallback-2", slug: "ferdowsi", name: "Ferdowsi", subtitle: t("featured.label"), imageUrl: FALLBACK_IMAGE },
     { id: "fallback-3", slug: "parvin-etesami", name: "Parvin Etesami", subtitle: t("featured.label"), imageUrl: FALLBACK_IMAGE },
     { id: "fallback-4", slug: "sohrab-sepehri", name: "Sohrab Sepehri", subtitle: t("featured.label"), imageUrl: FALLBACK_IMAGE },
   ];
-  const items = (apiItems.length >= 4 ? apiItems : fallbackItems).slice(0, 8);
+  const uniqueItems = Array.from(new Map(apiItems.map((item) => [item.slug, item])).values());
+  const prioritySlugs = PRIORITY_MEMORIALS.map((item) => item.slug);
+  const priorityItems = PRIORITY_MEMORIALS.map((priority) => ({
+    ...priority,
+    ...uniqueItems.find((item) => item.slug === priority.slug),
+    name: priority.name,
+    imageUrl: uniqueItems.find((item) => item.slug === priority.slug)?.imageUrl ?? priority.imageUrl,
+  }));
+  const remainingItems = uniqueItems.filter((item) => !prioritySlugs.includes(item.slug));
+  const items = (uniqueItems.length >= 4 ? [...priorityItems, ...remainingItems] : fallbackItems).slice(0, 10);
   const midpoint = Math.ceil(items.length / 2);
 
   return (
@@ -91,12 +125,7 @@ export function HeroSection() {
           </h1>
           <p>{t("subtitle")}</p>
           <div className="landing-hero-actions">
-            <Link href="/memorial/create" className="halvaa-btn-primary min-h-12 px-6 text-sm">
-              {t("btn.create")}
-            </Link>
-            <Link href="/explore" className="halvaa-btn-secondary min-h-12 px-6 text-sm">
-              {t("btn.explore")}
-            </Link>
+            <MemorialSearchCTA className="landing-hero-search" />
           </div>
         </motion.div>
 

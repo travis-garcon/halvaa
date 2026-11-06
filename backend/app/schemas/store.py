@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.models.enums import PaymentProvider
+
 
 class StoreItemPublic(BaseModel):
     id: UUID
@@ -21,6 +23,7 @@ class CheckoutCreate(BaseModel):
     memorial_id: UUID | None = None
     locale: str = "en"
     country_code: str | None = None
+    provider: PaymentProvider | None = None
 
 
 class CheckoutResponse(BaseModel):
@@ -29,6 +32,16 @@ class CheckoutResponse(BaseModel):
     amount: int
     currency: str
     checkout_url: str
+    provider_reference: str | None = None
+    test_mode: bool = False
+
+
+class PaymentVerifyResponse(BaseModel):
+    purchase_id: UUID
+    status: str
+    provider: str
+    provider_reference: str | None = None
+    message: str
 
 
 class PurchasePublic(BaseModel):

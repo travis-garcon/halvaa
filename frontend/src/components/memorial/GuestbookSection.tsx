@@ -12,9 +12,9 @@ type GuestbookSectionProps = {
   memorialId: string;
 };
 
-function SkeletonEntries() {
+function SkeletonEntries({ label }: { label: string }) {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Loading guestbook entries">
+    <div className="space-y-4" aria-busy="true" aria-label={label}>
       {[1, 2, 3].map((i) => (
         <div key={i} className="rounded-[1.75rem] border border-border/80 bg-background p-5 shadow-soft">
           <div className="skeleton skeleton-text w-1/3" />
@@ -152,7 +152,7 @@ export function GuestbookSection({ memorialId }: GuestbookSectionProps) {
         )}
       </form>
 
-      {isLoading && <SkeletonEntries />}
+      {isLoading && <SkeletonEntries label={t("loading")} />}
 
       {error && (
         <p className="rounded-[1.5rem] border border-border bg-background px-4 py-3 text-sm text-muted" role="alert">

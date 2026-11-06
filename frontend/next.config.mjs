@@ -78,6 +78,10 @@ function apiOrigins() {
   return originsFromUrls([process.env.NEXT_PUBLIC_API_URL].filter(Boolean));
 }
 
+function internalApiUrl() {
+  return (process.env.NEXT_INTERNAL_API_URL || "http://backend:8000/api/v1").replace(/\/$/, "");
+}
+
 function originsFromUrls(urls) {
   return [...new Set(urls.flatMap((value) => {
     try {
@@ -97,6 +101,18 @@ const nextConfig = {
   images: {
     remotePatterns: apiUploadPatterns(),
     formats: ["image/avif", "image/webp"],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${internalApiUrl()}/:path*`,
+      },
+      {
+        source: "/uploads/:path*",
+        destination: `${internalApiUrl().replace(/\/api\/v1$/, "")}/uploads/:path*`,
+      },
+    ];
   },
   async headers() {
     const allowedOrigins = [...new Set([...localMapOrigins(), ...apiOrigins()])].join(" ");

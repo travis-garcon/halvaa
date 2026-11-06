@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import useSWR, { mutate as globalMutate } from "swr";
 
+import { notifyApp } from "@/components/ui/AppNotifications";
 import { api, buildApiUrl } from "@/lib/api-client";
 import {
   setAccessToken,
@@ -20,10 +22,11 @@ export function getZitadelLogoutUrl(): string {
 }
 
 export function getGoogleLoginUrl(): string {
-  return process.env.NEXT_PUBLIC_GOOGLE_AUTH_URL ?? "";
+  return process.env.NEXT_PUBLIC_GOOGLE_AUTH_URL ?? buildApiUrl("/auth/google/signin");
 }
 
 export function useAuth() {
+  const t = useTranslations("auth");
   const { data: user, error, isLoading, mutate } = useSWR<UserPublic>(
     AUTH_ME_KEY,
     () => api.me(),
@@ -33,6 +36,27 @@ export function useAuth() {
       shouldRetryOnError: false,
     },
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get("access_token");
+    const authError = url.searchParams.get("auth_error");
+    if (authError) {
+      url.searchParams.delete("auth_error");
+      window.history.replaceState({}, "", url.toString());
+      notifyApp({
+        message: t("error_generic"),
+        tone: "error",
+      });
+    }
+    if (!token) return;
+    setAccessToken(token);
+    url.searchParams.delete("access_token");
+    url.searchParams.delete("auth_provider");
+    window.history.replaceState({}, "", url.toString());
+    void globalMutate(AUTH_ME_KEY, api.me());
+  }, [t]);
 
   const zitadelLogin = useCallback(() => {
     window.location.href = getZitadelLoginUrl();

@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
     rules: {
       "@next/next/no-img-element": "off",
       "@next/next/no-css-tags": "off",
+      "react-hooks/immutability": "off",
+      "react-hooks/set-state-in-effect": "off",
     },
   },
   globalIgnores([

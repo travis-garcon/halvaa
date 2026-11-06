@@ -12,8 +12,8 @@ from app.models.media import MediaAsset
 from app.models.timeline import TimelineEvent
 from app.models.user import User
 from app.schemas.media import MediaPublic, MediaUpdate
-from app.services.media_public import media_asset_to_public
-from app.services.media_processor import process_media_thumbnail_task, save_upload_and_enqueue
+from app.services.media_public import media_asset_is_available, media_asset_to_public
+from app.services.media_processor import delete_media_storage, process_media_thumbnail_task, save_upload_and_enqueue
 from app.services.permissions import require_memorial_access
 from app.services.upload_validator import validate_upload
 
@@ -37,7 +37,7 @@ def list_media(
         .where(MediaAsset.memorial_id == memorial_id)
         .order_by(MediaAsset.sort_order.asc(), MediaAsset.created_at.desc())
     ).all()
-    return [_media_to_public(asset) for asset in assets]
+    return [_media_to_public(asset) for asset in assets if media_asset_is_available(asset)]
 
 
 @router.patch("/{media_id}", response_model=MediaPublic)
@@ -80,6 +80,7 @@ def delete_media(
         session.add(event)
     session.delete(asset)
     session.commit()
+    delete_media_storage(asset)
 
 
 @router.post("", response_model=MediaPublic, status_code=status.HTTP_201_CREATED)

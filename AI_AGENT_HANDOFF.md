@@ -371,3 +371,24 @@ Current OTP delivery state:
 - Backend OTP service is implemented and attempts server-side email delivery.
 - Direct SMTP from this VPS is rejected by Gmail unless `halvaa.app` mail DNS is configured correctly. Latest Gmail errors mention SPF/DKIM failure for `halvaa.app` with IP `46.249.101.229` and missing/mismatched PTR. The known required production fixes are reverse DNS/PTR for `46.249.101.229`, SPF allowing the sending IP or relay, DKIM signing, and DMARC.
 - Practical alternative: set real SMTP relay credentials in `backend/.env.production` (`SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, etc.) and set `SMTP_DIRECT_DELIVERY=false` if the relay should be mandatory.
+
+## 2026-06-29 Landing/Memorial UI Pass
+
+Done:
+- Removed the top padding from the landing hero content area.
+- Changed the sticky story section from a `next/image` element to a CSS `background-image` cover using `/assets/img/tree.png`.
+- Added blurred glass paragraph panels with rounded corners, mini eyebrow text, scroll animation, and flat inline SVG icons.
+- Changed memorial stat/detail blocks to use more compact inline/grid layouts on mobile.
+- Replaced the memorial gallery grid with a horizontal Swiper slider.
+- Added a fullscreen gallery image viewer when a gallery photo is tapped/clicked.
+- Replaced direct share-copy behavior with a bottom sheet that generates a client-side QR code for the current URL and includes a copyable URL field.
+- Added `qrcode` and `@types/qrcode` to the frontend dependencies.
+
+Verification:
+- `npm run typecheck` passed.
+- Locale JSON parse check for `en`, `fa`, `ar`, and `zh` passed.
+- `docker compose -f docker-compose.prod.yml up -d --build --no-deps backend frontend` passed after a long frontend build.
+- `halvaa-backend-1` and `halvaa-frontend-1` are healthy.
+- `GET http://localhost:8000/health` returns `{"status":"ok"}`.
+- `HEAD http://localhost:3000/en`, `HEAD http://localhost:3000/fa`, and `HEAD http://localhost:3000/en/memorial/mahatma-gandhi` return HTTP 200.
+- `HEAD http://localhost:3000/assets/img/tree.png` returns HTTP 200.

@@ -6,6 +6,7 @@ class MemorialStatus(str, enum.Enum):
     PENDING_APPROVAL = "PENDING_APPROVAL"
     PUBLISHED = "PUBLISHED"
     FEATURED = "FEATURED"
+    DEACTIVATED = "DEACTIVATED"
 
 
 class CollaboratorRole(str, enum.Enum):
@@ -53,8 +54,11 @@ class UserRole(str, enum.Enum):
 
 class StoreItemKind(str, enum.Enum):
     CUSTOM_MEMORIAL_ID = "CUSTOM_MEMORIAL_ID"
+    VERIFIED_BADGE = "VERIFIED_BADGE"
+    CERAMIC_PLAQUE_SET = "CERAMIC_PLAQUE_SET"
     FEATURED_PLACEMENT = "FEATURED_PLACEMENT"
     EXTRA_MEMORIAL_SLOT = "EXTRA_MEMORIAL_SLOT"
+    MEMORIAL_PACKAGE = "MEMORIAL_PACKAGE"
     THEME_PACK = "THEME_PACK"
 
 
@@ -68,3 +72,4 @@ class PurchaseStatus(str, enum.Enum):
 class PaymentProvider(str, enum.Enum):
     STRIPE = "STRIPE"
     ZARINPAL = "ZARINPAL"
+    CRYPTO = "CRYPTO"

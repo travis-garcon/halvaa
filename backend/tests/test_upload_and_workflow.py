@@ -7,6 +7,7 @@ from app.main import app
 from app.core.config import get_settings
 from app.models.enums import MediaType, MemorialStatus
 from app.services.memorial_workflow import assert_valid_status_transition
+from app.services.media_public import storage_key_is_available
 from app.services.upload_validator import _detect_media_type
 
 
@@ -41,15 +42,11 @@ class TestMemorialStatusTransitions:
             assert_valid_status_transition(MemorialStatus.PUBLISHED, MemorialStatus.DRAFT)
         assert exc.value.status_code == 400
 
-    def test_pending_to_draft_rejected(self) -> None:
-        with pytest.raises(HTTPException) as exc:
-            assert_valid_status_transition(MemorialStatus.PENDING_APPROVAL, MemorialStatus.DRAFT)
-        assert exc.value.status_code == 400
+    def test_pending_to_draft_allowed_for_requested_changes(self) -> None:
+        assert_valid_status_transition(MemorialStatus.PENDING_APPROVAL, MemorialStatus.DRAFT)
 
-    def test_draft_to_published_rejected(self) -> None:
-        with pytest.raises(HTTPException) as exc:
-            assert_valid_status_transition(MemorialStatus.DRAFT, MemorialStatus.PUBLISHED)
-        assert exc.value.status_code == 400
+    def test_draft_to_published_allowed_for_immediate_publish(self) -> None:
+        assert_valid_status_transition(MemorialStatus.DRAFT, MemorialStatus.PUBLISHED)
 
     def test_featured_to_draft_rejected(self) -> None:
         with pytest.raises(HTTPException) as exc:
@@ -67,6 +64,21 @@ class TestMediaRouteImports:
         assert media_route.MediaType.IMAGE == MediaType.IMAGE
 
 
+class TestMediaStorageAvailability:
+    def test_existing_local_file_is_available(self, tmp_path: Path) -> None:
+        media_file = tmp_path / "portrait.webp"
+        media_file.write_bytes(b"portrait")
+
+        assert storage_key_is_available(str(media_file)) is True
+
+    def test_missing_local_file_is_unavailable(self, tmp_path: Path) -> None:
+        assert storage_key_is_available(str(tmp_path / "missing.webp")) is False
+
+    def test_public_and_remote_media_remain_available(self) -> None:
+        assert storage_key_is_available("/images/example.jpg") is True
+        assert storage_key_is_available("https://cdn.example.com/example.jpg") is True
+
+
 class TestUploadDeliveryHeaders:
     def test_versioned_uploads_are_cacheable(self) -> None:
         settings = get_settings()
@@ -81,3 +93,17 @@ class TestUploadDeliveryHeaders:
         assert response.status_code == 200
         assert response.headers["Cache-Control"] == "public, max-age=31536000, immutable"
         assert response.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+
+    def test_webp_thumbnail_has_browser_safe_content_type(self) -> None:
+        settings = get_settings()
+        upload_root = Path(settings.upload_dir)
+        sample = upload_root / "tests" / "portrait.webp"
+        sample.parent.mkdir(parents=True, exist_ok=True)
+        sample.write_bytes(b"webp thumbnail")
+
+        with TestClient(app) as client:
+            response = client.get("/uploads/tests/portrait.webp?v=123&media=2")
+
+        assert response.status_code == 200
+        assert response.headers["Content-Type"] == "image/webp"
+        assert response.headers["X-Content-Type-Options"] == "nosniff"

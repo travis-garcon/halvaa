@@ -2,12 +2,24 @@ export type MemorialStatus =
   | "DRAFT"
   | "PENDING_APPROVAL"
   | "PUBLISHED"
-  | "FEATURED";
+  | "FEATURED"
+  | "DEACTIVATED";
 
 export type FamilyMember = {
+  id?: string;
   name: string;
   relation: string;
   years?: string;
+};
+
+export type MemorialLocation = {
+  kind: string;
+  label?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type MemorialPublic = {
@@ -21,8 +33,16 @@ export type MemorialPublic = {
   burial_plot_name: string | null;
   qr_code_url: string | null;
   translations: Record<string, Record<string, string>>;
+  translation_status?: Record<string, unknown>;
   theme_overrides: Record<string, string>;
   family_tree: FamilyMember[];
+  category?: string | null;
+  metadata?: Record<string, unknown>;
+  filter_tags?: Record<string, unknown>;
+  locations?: MemorialLocation[];
+  is_verified?: boolean;
+  verified_at?: string | null;
+  view_count?: number;
   latitude: number | null;
   longitude: number | null;
   created_at: string;
@@ -97,6 +117,10 @@ export type GeoJSONFeature = {
     distance_m: number;
     burial_site_name?: string | null;
     burial_plot_name?: string | null;
+    image_url?: string | null;
+    status?: MemorialStatus;
+    is_verified?: boolean;
+    view_count?: number;
   };
 };
 
@@ -108,12 +132,17 @@ export type GridMemorial = {
   burialAddress?: string | null;
   burialSiteName?: string | null;
   burialPlotName?: string | null;
+  category?: string | null;
+  metadata?: Record<string, unknown>;
+  filterTags?: Record<string, unknown>;
   latitude?: number | null;
   longitude?: number | null;
   createdAt?: string;
   updatedAt?: string;
   publishedAt?: string | null;
   featuredAt?: string | null;
+  isVerified?: boolean;
+  viewCount?: number;
   distanceM?: number;
   imageUrl?: string;
 };
@@ -131,6 +160,9 @@ export type ExploreMemorialFeed = {
     burial_address: string | null;
     burial_site_name: string | null;
     burial_plot_name: string | null;
+    category?: string | null;
+    metadata?: Record<string, unknown>;
+    filter_tags?: Record<string, unknown>;
     latitude: number | null;
     longitude: number | null;
     created_at: string;
@@ -138,7 +170,13 @@ export type ExploreMemorialFeed = {
     published_at: string | null;
     featured_at: string | null;
     image_url?: string | null;
+    is_verified?: boolean;
+    view_count?: number;
   }>;
+  total?: number;
+  limit?: number;
+  offset?: number;
+  has_more?: boolean;
 };
 
 export type MemorialCollaborator = {

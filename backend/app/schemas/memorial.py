@@ -12,6 +12,7 @@ from app.schemas.validators import Latitude, Longitude, SanitizedStr, SlugStr
 
 class MemorialCreate(BaseModel):
     slug: SlugStr | None = None
+    status: MemorialStatus = MemorialStatus.PUBLISHED
     birth_date: date | None = None
     death_date: date | None = None
     burial_address: SanitizedStr | None = Field(default=None, max_length=512)
@@ -19,10 +20,15 @@ class MemorialCreate(BaseModel):
     burial_plot_name: SanitizedStr | None = Field(default=None, max_length=255)
     qr_code_url: SanitizedStr | None = Field(default=None, max_length=2048)
     translations: dict[str, dict[str, SanitizedStr]] = Field(default_factory=dict)
+    translation_status: dict[str, Any] | None = None
     theme_overrides: dict[str, SanitizedStr] = Field(
         default_factory=lambda: {"--color-primary": "#FF6B00"},
     )
     family_tree: list[dict[str, SanitizedStr]] = Field(default_factory=list)
+    category: SanitizedStr | None = Field(default=None, max_length=80)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    filter_tags: dict[str, Any] = Field(default_factory=dict)
+    locations: list[dict[str, Any]] = Field(default_factory=list)
     latitude: Latitude | None = None
     longitude: Longitude | None = None
 
@@ -35,8 +41,13 @@ class MemorialUpdate(BaseModel):
     burial_plot_name: SanitizedStr | None = Field(default=None, max_length=255)
     qr_code_url: SanitizedStr | None = Field(default=None, max_length=2048)
     translations: dict[str, dict[str, SanitizedStr]] | None = None
+    translation_status: dict[str, Any] | None = None
     theme_overrides: dict[str, SanitizedStr] | None = None
     family_tree: list[dict[str, SanitizedStr]] | None = None
+    category: SanitizedStr | None = Field(default=None, max_length=80)
+    metadata: dict[str, Any] | None = None
+    filter_tags: dict[str, Any] | None = None
+    locations: list[dict[str, Any]] | None = None
     latitude: Latitude | None = None
     longitude: Longitude | None = None
     status: MemorialStatus | None = None
@@ -54,8 +65,16 @@ class MemorialPublic(BaseModel):
     burial_plot_name: str | None = None
     qr_code_url: str | None = None
     translations: dict[str, Any]
+    translation_status: dict[str, Any] = Field(default_factory=dict)
     theme_overrides: dict[str, str]
     family_tree: list[dict[str, str]] = Field(default_factory=list)
+    category: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    filter_tags: dict[str, Any] = Field(default_factory=dict)
+    is_verified: bool = False
+    verified_at: datetime | None = None
+    view_count: int = 0
+    locations: list[dict[str, Any]] = Field(default_factory=list)
     latitude: float | None = None
     longitude: float | None = None
     created_at: datetime
@@ -72,6 +91,11 @@ class MemorialPublic(BaseModel):
 
 class MemorialStatusUpdate(BaseModel):
     status: MemorialStatus
+
+
+class MemorialTranslateRequest(BaseModel):
+    source_locale: str | None = Field(default=None, max_length=10)
+    target_locales: list[str] = Field(default_factory=lambda: ["en", "fa", "ar", "zh"])
 
 
 class MemorialReviewUpdate(BaseModel):

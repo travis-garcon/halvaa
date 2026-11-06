@@ -1,5 +1,5 @@
 import { getAccessToken } from "@/lib/auth-storage";
-import type { OtpStartPayload, OtpStartResponse, RegisterPayload, TokenResponse, UserPublic } from "@/types/auth";
+import type { OtpStartPayload, OtpStartResponse, RegisterPayload, TokenResponse, UserPublic, UserUpdatePayload } from "@/types/auth";
 import type {
   ExploreFeedKind,
   ExploreMemorialFeed,
@@ -19,6 +19,7 @@ import type {
 
 export type MemorialCreatePayload = {
   slug?: string | null;
+  status?: "DRAFT" | "PENDING_APPROVAL" | "PUBLISHED" | "FEATURED" | "DEACTIVATED";
   birth_date?: string | null;
   death_date?: string | null;
   burial_address?: string | null;
@@ -26,8 +27,13 @@ export type MemorialCreatePayload = {
   burial_plot_name?: string | null;
   qr_code_url?: string | null;
   translations?: Record<string, Record<string, string>>;
+  translation_status?: Record<string, unknown>;
   theme_overrides?: Record<string, string>;
   family_tree?: Array<{ name: string; relation: string; years?: string }>;
+  category?: string | null;
+  metadata?: Record<string, unknown>;
+  filter_tags?: Record<string, unknown>;
+  locations?: Array<Record<string, unknown>>;
   latitude?: number | null;
   longitude?: number | null;
 };
@@ -49,6 +55,16 @@ export type CheckoutResponse = {
   amount: number;
   currency: string;
   checkout_url: string;
+  provider_reference?: string | null;
+  test_mode?: boolean;
+};
+
+export type PaymentVerifyResponse = {
+  purchase_id: string;
+  status: string;
+  provider: string;
+  provider_reference?: string | null;
+  message: string;
 };
 
 export type AdminKpis = {
@@ -58,6 +74,18 @@ export type AdminKpis = {
   guestbook_entries: number;
   income_usd_cents: number;
   income_irr: number;
+};
+
+export type AdminLandingPlacement = {
+  id: string;
+  memorial_id: string;
+  category: string;
+  sort_order: number;
+  label?: string | null;
+  is_active: boolean;
+  memorial_slug: string;
+  memorial_name?: string | null;
+  created_at: string;
 };
 
 export type ContributionPublic = {
@@ -74,11 +102,11 @@ export type ContributionPublic = {
 };
 
 export type MemorialUpdatePayload = Partial<MemorialCreatePayload> & {
-  status?: "DRAFT" | "PENDING_APPROVAL" | "PUBLISHED" | "FEATURED";
+  status?: "DRAFT" | "PENDING_APPROVAL" | "PUBLISHED" | "FEATURED" | "DEACTIVATED";
 };
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+  process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
 
 export class ApiError extends Error {
   status: number;
@@ -96,7 +124,7 @@ type ApiFetchOptions = RequestInit & {
 
 export function buildApiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE_URL}${normalized}`;
+  return `${API_BASE_URL.replace(/\/$/, "")}${normalized}`;
 }
 
 export async function apiFetch<T>(
@@ -150,6 +178,43 @@ export async function apiFetch<T>(
   return response.json() as Promise<T>;
 }
 
+function uploadFormData<T>(path: string, body: FormData, onProgress?: (progress: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", buildApiUrl(path));
+    request.withCredentials = true;
+    const token = getAccessToken();
+    if (token) request.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    request.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable) return;
+      onProgress?.(Math.round((event.loaded / event.total) * 100));
+    });
+    request.addEventListener("load", () => {
+      if (request.status >= 200 && request.status < 300) {
+        onProgress?.(100);
+        try {
+          resolve(JSON.parse(request.responseText) as T);
+        } catch {
+          reject(new ApiError("Invalid upload response", request.status));
+        }
+        return;
+      }
+      let message = `Request failed (${request.status})`;
+      try {
+        const payload = JSON.parse(request.responseText) as { detail?: string };
+        if (payload.detail) message = payload.detail;
+      } catch {
+        // Keep the generic request error.
+      }
+      reject(new ApiError(message, request.status));
+    });
+    request.addEventListener("error", () => reject(new ApiError("Upload failed", 0)));
+    request.addEventListener("abort", () => reject(new ApiError("Upload canceled", 0)));
+    request.send(body);
+  });
+}
+
 export const api = {
   login: (email: string, password: string) => {
     const body = new URLSearchParams();
@@ -182,6 +247,19 @@ export const api = {
 
   me: () => apiFetch<UserPublic>("/auth/me", { auth: true }),
 
+  updateMe: (payload: UserUpdatePayload) =>
+    apiFetch<UserPublic>("/auth/me", {
+      method: "PATCH",
+      auth: true,
+      body: JSON.stringify(payload),
+    }),
+
+  uploadMyAvatar: (file: File, onProgress?: (progress: number) => void) => {
+    const body = new FormData();
+    body.set("file", file);
+    return uploadFormData<UserPublic>("/auth/me/avatar", body, onProgress);
+  },
+
   createMemorial: (payload: MemorialCreatePayload) =>
     apiFetch<MemorialPublic>("/memorials", {
       method: "POST",
@@ -196,31 +274,48 @@ export const api = {
     longitude: number;
     radiusM?: number;
     locale?: string;
+    q?: string;
+    limit?: number;
   }) => {
     const search = new URLSearchParams({
       latitude: String(params.latitude),
       longitude: String(params.longitude),
       radius_m: String(params.radiusM ?? 5000),
       locale: params.locale ?? "en",
+      limit: String(params.limit ?? 30),
+      data_v: "2",
     });
-    return apiFetch<GeoJSONFeatureCollection>(`/explore/nearby?${search}`);
+    if (params.q?.trim()) {
+      search.set("q", params.q.trim());
+    }
+    return apiFetch<GeoJSONFeatureCollection>(`/explore/nearby?${search}`, { cache: "no-store" });
   },
 
   discoverMemorials: (params: {
     kind: ExploreFeedKind;
     locale?: string;
     limit?: number;
+    offset?: number;
+    q?: string;
   }) => {
     const search = new URLSearchParams({
       kind: params.kind,
       locale: params.locale ?? "en",
-      limit: String(params.limit ?? 12),
+      limit: String(params.limit ?? 30),
+      offset: String(params.offset ?? 0),
+      data_v: "2",
     });
-    return apiFetch<ExploreMemorialFeed>(`/explore/discover?${search}`);
+    if (params.q?.trim()) {
+      search.set("q", params.q.trim());
+    }
+    return apiFetch<ExploreMemorialFeed>(`/explore/discover?${search}`, { cache: "no-store" });
   },
 
   memorialBySlug: (slug: string, auth = false) =>
     apiFetch<MemorialProfile>(`/memorials/slug/${slug}`, { auth }),
+
+  recordMemorialView: (memorialId: string) =>
+    apiFetch<void>(`/memorials/${memorialId}/view`, { method: "POST" }),
 
   updateMemorial: (id: string, payload: MemorialUpdatePayload) =>
     apiFetch<MemorialPublic>(`/memorials/${id}`, {
@@ -229,11 +324,24 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  deleteMemorial: (id: string) =>
+    apiFetch<void>(`/memorials/${id}`, {
+      method: "DELETE",
+      auth: true,
+    }),
+
   updateMemorialStatus: (id: string, status: MemorialUpdatePayload["status"]) =>
     apiFetch<MemorialPublic>(`/memorials/${id}/status`, {
       method: "POST",
       auth: true,
       body: JSON.stringify({ status }),
+    }),
+
+  translateMemorial: (id: string, payload: { source_locale?: string | null; target_locales?: string[] }) =>
+    apiFetch<MemorialPublic>(`/memorials/${id}/translate`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
     }),
 
   memorialReviewHistory: (id: string, limit = 10) =>
@@ -261,15 +369,11 @@ export const api = {
       auth: true,
     }),
 
-  uploadMedia: (memorialId: string, file: File, category = "GALLERY") => {
+  uploadMedia: (memorialId: string, file: File, category = "GALLERY", onProgress?: (progress: number) => void) => {
     const body = new FormData();
     body.set("file", file);
     body.set("category", category);
-    return apiFetch<MediaPublic>(`/memorials/${memorialId}/media`, {
-      method: "POST",
-      auth: true,
-      body,
-    });
+    return uploadFormData<MediaPublic>(`/memorials/${memorialId}/media`, body, onProgress);
   },
 
   collaborators: (memorialId: string) =>
@@ -392,17 +496,25 @@ export const api = {
 
   storeItems: () => apiFetch<StoreItemPublic[]>("/store/items"),
 
-  createCheckout: (payload: { store_item_id: string; memorial_id?: string | null; locale?: string; country_code?: string | null }) =>
+  createCheckout: (payload: { store_item_id: string; memorial_id?: string | null; locale?: string; country_code?: string | null; provider?: "STRIPE" | "ZARINPAL" | "CRYPTO" }) =>
     apiFetch<CheckoutResponse>("/store/checkout", {
       method: "POST",
       auth: true,
       body: JSON.stringify(payload),
     }),
 
+  completeCheckoutForDevelopment: (purchaseId: string) =>
+    apiFetch<PaymentVerifyResponse>(`/store/checkout/${purchaseId}/manual-complete`, {
+      method: "POST",
+      auth: true,
+    }),
+
   adminKpis: () => apiFetch<AdminKpis>("/admin/kpis", { auth: true }),
+  adminLandingPlacements: (locale = "en") =>
+    apiFetch<AdminLandingPlacement[]>(`/admin/landing-placements?${new URLSearchParams({ locale })}`, { auth: true }),
 
   landingFeed: (locale = "en") =>
-    apiFetch<{ categories: Array<{ category: string; label?: string | null; items: ExploreMemorialFeed["items"] }> }>(`/explore/landing?${new URLSearchParams({ locale })}`),
+    apiFetch<{ categories: Array<{ category: string; label?: string | null; items: ExploreMemorialFeed["items"] }> }>(`/explore/landing?${new URLSearchParams({ locale, data_v: "2" })}`, { cache: "no-store" }),
 
   createContribution: (
     memorialId: string,

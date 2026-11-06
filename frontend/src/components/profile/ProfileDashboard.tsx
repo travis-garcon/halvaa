@@ -1,399 +1,300 @@
 "use client";
 
+import { ChangeEvent, useEffect, useState } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
 
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MediaPreviewDialog, preparePreviewFiles, type PreviewFile } from "@/components/ui/MediaPreviewDialog";
+import { notifyApp } from "@/components/ui/AppNotifications";
 import { useAuth } from "@/hooks/use-auth";
-import { useCollaboratorInvitations } from "@/hooks/use-collaborator-invitations";
 import { Link } from "@/i18n/routing";
 import { api, ApiError } from "@/lib/api-client";
+import { invalidateExploreAfterMemorialDelete } from "@/lib/explore-cache";
+import { openAuthModal } from "@/lib/auth-modal-events";
+import type { MemorialStatus } from "@/types/memorial";
+
+type ProfileTab = "memorials" | "plan" | "account";
+type MemorialFilter = "all" | "draft" | "published";
 
 function getName(memorial: Awaited<ReturnType<typeof api.myMemorials>>[number], locale: string): string {
   return memorial.translations?.[locale]?.name ?? memorial.translations?.en?.name ?? memorial.slug;
 }
 
-function formatDateTime(value: string | null | undefined, locale: string): string | null {
-  if (!value) {
-    return null;
-  }
-  return new Date(value).toLocaleString(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+function TabIcon({ tab }: { tab: ProfileTab }) {
+  const common = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (tab === "memorials") return <svg {...common}><path d="M6 20V8l6-4 6 4v12" /><path d="M9 20v-6h6v6" /></svg>;
+  if (tab === "plan") return <svg {...common}><path d="M4 7h16v10H4z" /><path d="M4 10h16" /><path d="M8 15h3" /></svg>;
+  return <svg {...common}><circle cx="12" cy="8" r="3" /><path d="M6 20a6 6 0 0 1 12 0" /><path d="M19 5v4M17 7h4" /></svg>;
 }
 
 export function ProfileDashboard() {
   const t = useTranslations("profile");
   const tCommon = useTranslations("common");
   const tStatuses = useTranslations("editMemorial.statuses");
-  const { user, isAuthenticated, isLoading, zitadelLogin } = useAuth();
-  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
-  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
-  const [decliningId, setDecliningId] = useState<string | null>(null);
-  const [moderatingId, setModeratingId] = useState<string | null>(null);
-  const [reviewingMemorialId, setReviewingMemorialId] = useState<string | null>(null);
-  const { data: memorials = [], isLoading: memorialsLoading } = useSWR(
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<ProfileTab>("memorials");
+  const [profileName, setProfileName] = useState("");
+  const [profileLocale, setProfileLocale] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [avatarPreviewFiles, setAvatarPreviewFiles] = useState<PreviewFile[]>([]);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [memorialFilter, setMemorialFilter] = useState<MemorialFilter>("all");
+  const [memorialSearch, setMemorialSearch] = useState("");
+  const [deleteCandidate, setDeleteCandidate] = useState<{ id: string; name: string } | null>(null);
+  const [deletingMemorial, setDeletingMemorial] = useState(false);
+  const [publishingMemorialId, setPublishingMemorialId] = useState<string | null>(null);
+  const { data: memorials = [], isLoading: memorialsLoading, mutate: mutateMemorials } = useSWR(
     isAuthenticated ? ["profile", "my-memorials"] : null,
     () => api.myMemorials(),
   );
-  const { data: invitations, mutate: mutateInvitations } = useCollaboratorInvitations(isAuthenticated);
-  const { data: approvalQueue = [], mutate: mutateApprovalQueue } = useSWR(
-    isAuthenticated ? ["profile", "approval-queue", user?.locale ?? "en"] : null,
-    () => api.pendingMemorialApprovals(user?.locale ?? "en"),
-  );
-  const { data: moderationQueue = [], mutate: mutateModerationQueue } = useSWR(
-    isAuthenticated ? ["profile", "moderation-queue"] : null,
-    () => api.pendingGuestbookQueue(user?.locale ?? "en"),
-  );
-  const moderationGroups = Object.values(
-    moderationQueue.reduce<Record<string, { memorialId: string; memorialSlug: string; memorialName: string; items: typeof moderationQueue }>>((groups, entry) => {
-      const existing = groups[entry.memorial_id] ?? {
-        memorialId: entry.memorial_id,
-        memorialSlug: entry.memorial_slug,
-        memorialName: entry.memorial_name ?? entry.memorial_slug,
-        items: [],
-      };
-      existing.items.push(entry);
-      groups[entry.memorial_id] = existing;
-      return groups;
-    }, {}),
-  );
-  const totalReviewItems = approvalQueue.length + moderationQueue.length;
-  const getStatusLabel = (status: "DRAFT" | "PENDING_APPROVAL" | "PUBLISHED" | "FEATURED") => tStatuses(status);
 
-  const handleAcceptInvitation = async (collaboratorId: string) => {
-    setAcceptingId(collaboratorId);
-    setInviteMessage(null);
-    try {
-      await api.acceptCollaboratorInvitation(collaboratorId);
-      await Promise.all([mutateInvitations(), globalMutate(["profile", "my-memorials"])]);
-      setInviteMessage(t("invitations.accepted"));
-    } catch (error) {
-      setInviteMessage(error instanceof ApiError ? error.message : t("invitations.error"));
-    } finally {
-      setAcceptingId(null);
-    }
-  };
+  useEffect(() => {
+    if (!user) return;
+    setProfileName(user.full_name);
+    setProfileLocale(user.locale);
+    setProfileAvatarUrl(user.avatar_url ?? "");
+    setProfileEmail(user.email);
+    setProfilePhone(user.phone_number ?? "");
+    setProfileAddress(user.address ?? "");
+  }, [user]);
 
-  const handleDeclineInvitation = async (collaboratorId: string) => {
-    setDecliningId(collaboratorId);
-    setInviteMessage(null);
-    try {
-      await api.declineCollaboratorInvitation(collaboratorId);
-      await mutateInvitations();
-      setInviteMessage(t("invitations.declined"));
-    } catch (error) {
-      setInviteMessage(error instanceof ApiError ? error.message : t("invitations.error"));
-    } finally {
-      setDecliningId(null);
-    }
-  };
-
-  const handleModerateQueueEntry = async (memorialId: string, entryId: string, status: "APPROVED" | "REJECTED") => {
-    setModeratingId(entryId);
-    setReviewMessage(null);
-    try {
-      await api.moderateGuestbookEntry(memorialId, entryId, status);
-      await mutateModerationQueue();
-      setReviewMessage(status === "APPROVED" ? t("moderation.approved") : t("moderation.rejected"));
-    } catch (error) {
-      setReviewMessage(error instanceof ApiError ? error.message : t("moderation.error"));
-    } finally {
-      setModeratingId(null);
-    }
-  };
-
-  const handleReviewMemorial = async (memorialId: string, decision: "APPROVE" | "REQUEST_CHANGES" | "FEATURE") => {
-    setReviewingMemorialId(memorialId);
-    setReviewMessage(null);
-    try {
-      await api.reviewMemorial(memorialId, decision);
-      await mutateApprovalQueue();
-      setReviewMessage(
-        decision === "APPROVE"
-          ? t("approvals.approved")
-          : decision === "FEATURE"
-            ? t("approvals.featured")
-            : t("approvals.requestedChanges"),
-      );
-    } catch (error) {
-      setReviewMessage(error instanceof ApiError ? error.message : t("approvals.error"));
-    } finally {
-      setReviewingMemorialId(null);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="rounded-2xl border border-border bg-background p-6 text-sm text-muted">{t("loading")}</div>;
-  }
+  if (isLoading) return <div className="profile-empty-state">{t("loading")}</div>;
 
   if (!isAuthenticated || !user) {
     return (
-      <div className="rounded-2xl border border-border bg-background p-6 shadow-soft">
-        <h2 className="text-xl font-semibold text-foreground">{t("signInTitle")}</h2>
-        <p className="mt-2 text-sm text-muted">{t("signInBody")}</p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button type="button" onClick={zitadelLogin} className="halvaa-btn-primary cursor-pointer">
-            {tCommon("sign_in")}
-          </button>
-          <Link href="/explore" className="halvaa-btn-secondary inline-flex cursor-pointer">
-            {tCommon("backExplore")}
-          </Link>
-        </div>
+      <div className="profile-empty-state">
+        <h1>{t("signInTitle")}</h1>
+        <p>{t("signInBody")}</p>
+        <button type="button" onClick={openAuthModal} className="halvaa-btn-primary">{tCommon("sign_in")}</button>
       </div>
     );
   }
 
-  const drafts = memorials.filter((memorial) => memorial.status === "DRAFT").length;
-  const published = memorials.filter((memorial) => memorial.status === "PUBLISHED" || memorial.status === "FEATURED").length;
+  const completion = Math.max(0, Math.min(100, user.profile_completion_percent ?? (user.profile_completed ? 100 : 0)));
+  const circumference = 2 * Math.PI * 58;
+  const drafts = memorials.filter((item) => item.status === "DRAFT").length;
+  const published = memorials.filter((item) => item.status === "PUBLISHED" || item.status === "FEATURED").length;
+  const filteredMemorials = memorials.filter((memorial) => {
+    const matchesFilter = memorialFilter === "all"
+      || (memorialFilter === "draft" && memorial.status === "DRAFT")
+      || (memorialFilter === "published" && ["PUBLISHED", "FEATURED"].includes(memorial.status));
+    const query = memorialSearch.trim().toLocaleLowerCase(user.locale);
+    return matchesFilter && (!query || getName(memorial, user.locale).toLocaleLowerCase(user.locale).includes(query) || memorial.slug.toLowerCase().includes(query));
+  });
+
+  const queueAvatar = (files: FileList | null) => {
+    if (!files?.length) return;
+    setAvatarUploadProgress(0);
+    setAvatarPreviewFiles(preparePreviewFiles([files[0]], t("avatarInvalidType"), (size) => t("avatarTooLarge", { size })));
+  };
+
+  const closeAvatarPreview = () => {
+    avatarPreviewFiles.forEach((item) => item.previewUrl && URL.revokeObjectURL(item.previewUrl));
+    setAvatarPreviewFiles([]);
+  };
+
+  const uploadAvatar = async () => {
+    const selected = avatarPreviewFiles[0];
+    if (!selected) return;
+    setSavingProfile(true);
+    try {
+      const updatedUser = await api.uploadMyAvatar(selected.file, setAvatarUploadProgress);
+      await globalMutate(["auth", "me"], updatedUser, { revalidate: false });
+      setProfileAvatarUrl(updatedUser.avatar_url ?? "");
+      closeAvatarPreview();
+      notifyApp({ message: t("avatarSaved"), tone: "success" });
+    } catch (error) {
+      notifyApp({ message: error instanceof ApiError ? error.message : t("accountSaveError"), tone: "error" });
+    } finally {
+      setSavingProfile(false);
+      setAvatarUploadProgress(0);
+    }
+  };
+
+  const saveProfile = async () => {
+    setSavingProfile(true);
+    setProfileMessage(null);
+    try {
+      const updatedUser = await api.updateMe({
+        full_name: profileName.trim(),
+        locale: profileLocale || user.locale,
+        ...(user.locked_email ? {} : { email: profileEmail.trim() }),
+        ...(user.locked_phone_number ? {} : { phone_number: profilePhone.trim() || null }),
+        address: profileAddress.trim() || null,
+      });
+      await globalMutate(["auth", "me"], updatedUser, { revalidate: false });
+      setProfileMessage(t("accountSaved"));
+    } catch (error) {
+      setProfileMessage(error instanceof ApiError ? error.message : t("accountSaveError"));
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const publishDraft = async (memorialId: string) => {
+    setPublishingMemorialId(memorialId);
+    try {
+      await api.updateMemorialStatus(memorialId, "PUBLISHED");
+      await mutateMemorials();
+      notifyApp({ message: t("publishDraftSuccess"), tone: "success" });
+    } catch (error) {
+      notifyApp({ message: error instanceof ApiError ? error.message : t("publishDraftError"), tone: "error" });
+    } finally {
+      setPublishingMemorialId(null);
+    }
+  };
+
+  const deleteMemorial = async () => {
+    if (!deleteCandidate) return;
+    setDeletingMemorial(true);
+    try {
+      await api.deleteMemorial(deleteCandidate.id);
+      await mutateMemorials();
+      await invalidateExploreAfterMemorialDelete(deleteCandidate.id);
+      setDeleteCandidate(null);
+      notifyApp({ message: t("deleteSuccess"), tone: "success" });
+    } catch (error) {
+      notifyApp({ message: error instanceof ApiError ? error.message : t("deleteError"), tone: "error" });
+    } finally {
+      setDeletingMemorial(false);
+    }
+  };
+
+  const tabs: Array<{ id: ProfileTab; label: string }> = [
+    { id: "memorials", label: t("tabs.memorials") },
+    { id: "plan", label: t("tabs.planStore") },
+    { id: "account", label: t("tabs.account") },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-background p-5 shadow-soft">
-          <p className="text-sm text-muted">{t("account")}</p>
-          <p className="mt-2 font-semibold text-foreground">{user.full_name}</p>
-          <p className="mt-1 text-xs text-muted">{user.email}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-background p-5 shadow-soft">
-          <p className="text-sm text-muted">{t("stats.memorials")}</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{memorials.length}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-background p-5 shadow-soft">
-          <p className="text-sm text-muted">{t("published")}</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{published}</p>
-          <p className="mt-1 text-xs text-muted">{t("drafts", { count: drafts })}</p>
-        </div>
-      </div>
+    <div className="profile-workspace">
+      <header className="profile-summary">
+        <label className="profile-avatar-control" title={t("chooseProfilePhoto")}>
+          <svg className="profile-avatar-progress" viewBox="0 0 128 128" aria-label={t("profileCompletionValue", { count: completion })}>
+            <circle className="profile-avatar-progress-track" cx="64" cy="64" r="58" />
+            <circle
+              className={completion === 100 ? "profile-avatar-progress-value is-complete" : "profile-avatar-progress-value"}
+              cx="64" cy="64" r="58"
+              style={{ strokeDasharray: circumference, strokeDashoffset: circumference * (1 - completion / 100) }}
+            />
+          </svg>
+          <span className="profile-avatar-image">
+            {profileAvatarUrl ? <img src={profileAvatarUrl} alt={user.full_name} /> : <span>{user.full_name.trim().charAt(0).toUpperCase() || "H"}</span>}
+          </span>
+          <span className="profile-avatar-edit" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z" /><circle cx="12" cy="13" r="3" /></svg>
+          </span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => queueAvatar(event.target.files)} />
+        </label>
 
-      <div className="rounded-[2rem] border border-border bg-background p-5 shadow-soft sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold text-foreground">{t("invitations.title")}</h2>
-            <p className="mt-1 text-sm text-muted">{t("invitations.subtitle")}</p>
+        <div className="profile-summary-copy">
+          <p className="profile-summary-kicker">{t("title")}</p>
+          <h1>{user.full_name}</h1>
+          <p>{user.email}</p>
+          <div className="profile-completion-line">
+            <strong className={completion === 100 ? "is-complete" : ""}>{completion}%</strong>
+            <span>{completion === 100 ? t("completionDone") : t("profileCompletion")}</span>
           </div>
         </div>
 
-        {inviteMessage && <p className="mt-4 rounded-xl bg-surface px-4 py-3 text-sm text-foreground">{inviteMessage}</p>}
+        <button type="button" className={completion === 100 ? "halvaa-btn-secondary" : "halvaa-btn-primary"} onClick={() => setActiveTab("account")}>
+          {completion === 100 ? t("manageAccount") : t("completeProfile")}
+        </button>
+      </header>
 
-        {(invitations?.items.length ?? 0) === 0 ? (
-          <div className="mt-6 rounded-2xl border border-dashed border-border p-6 text-sm text-muted">{t("invitations.empty")}</div>
-        ) : (
-          <div className="mt-6 space-y-3">
-            {(invitations?.items ?? []).map((invitation) => (
-              <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-4 py-4">
-                <div>
-                  <p className="font-semibold text-foreground">{invitation.memorial_name ?? invitation.memorial_slug}</p>
-                  <p className="mt-1 text-xs text-muted">/{invitation.memorial_slug} · {t(`roles.${invitation.role}`)}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleAcceptInvitation(invitation.id)}
-                  disabled={acceptingId === invitation.id || decliningId === invitation.id}
-                  className="halvaa-btn-secondary cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {acceptingId === invitation.id ? t("invitations.accepting") : t("invitations.accept")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDeclineInvitation(invitation.id)}
-                  disabled={acceptingId === invitation.id || decliningId === invitation.id}
-                  className="inline-flex cursor-pointer items-center rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {decliningId === invitation.id ? t("invitations.declining") : t("invitations.decline")}
-                </button>
+      <nav className="profile-tabs" role="tablist" aria-label={t("tabLabel")}>
+        {tabs.map((tab) => (
+          <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} className={activeTab === tab.id ? "is-active" : ""} onClick={() => setActiveTab(tab.id)}>
+            <TabIcon tab={tab.id} />
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <section className="profile-tab-panel" role="tabpanel">
+        {activeTab === "memorials" ? (
+          <div className="profile-memorials">
+            <div className="profile-section-heading">
+              <div><h2>{t("myMemorials")}</h2><p>{t("myMemorialsHint")}</p></div>
+              <Link href="/memorial/create" className="halvaa-btn-primary inline-flex">{tCommon("create_memorial")}</Link>
+            </div>
+
+            <div className="profile-memorial-tools">
+              <div className="profile-stat-tabs">
+                {([
+                  ["all", memorials.length, t("stats.memorials")],
+                  ["draft", drafts, t("filterDrafts")],
+                  ["published", published, t("published")],
+                ] as const).map(([filter, count, label]) => (
+                  <button key={filter} type="button" className={memorialFilter === filter ? "is-active" : ""} onClick={() => setMemorialFilter(filter)}>
+                    <strong>{count}</strong><span>{label}</span>
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <label className="profile-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></svg>
+                <input type="search" value={memorialSearch} onChange={(event) => setMemorialSearch(event.target.value)} placeholder={t("searchMemorials")} />
+              </label>
+            </div>
 
-      <div className="rounded-[2rem] border border-border bg-background p-5 shadow-soft sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold text-foreground">{t("reviewCenter.title")}</h2>
-            <p className="mt-1 text-sm text-muted">{t("reviewCenter.subtitle")}</p>
-          </div>
-          <div className="flex gap-3 text-sm text-muted">
-            {user.is_superuser ? <span>{t("approvals.stats.pending", { count: approvalQueue.length })}</span> : null}
-            <span>{t("moderation.stats.entries", { count: moderationQueue.length })}</span>
-          </div>
-        </div>
-
-        {reviewMessage ? <p className="mt-4 rounded-xl bg-surface px-4 py-3 text-sm text-foreground">{reviewMessage}</p> : null}
-
-        {totalReviewItems === 0 ? (
-          <div className="mt-6 rounded-2xl border border-dashed border-border p-6 text-sm text-muted">{t("reviewCenter.empty")}</div>
-        ) : (
-          <div className="mt-6 space-y-6">
-            {user.is_superuser && approvalQueue.length > 0 ? (
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">{t("approvals.title")}</h3>
-                    <p className="mt-1 text-sm text-muted">{t("approvals.subtitle")}</p>
-                  </div>
-                  <div className="text-sm text-muted">{t("approvals.stats.pending", { count: approvalQueue.length })}</div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {approvalQueue.map((memorial) => {
-                    const submittedAt = formatDateTime(memorial.submitted_at ?? memorial.updated_at, user.locale);
-                    return (
-                      <div key={memorial.id} className="rounded-2xl border border-border bg-surface px-4 py-4">
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-foreground">{memorial.memorial_name ?? memorial.slug}</p>
-                              <span className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted">{getStatusLabel(memorial.status)}</span>
-                            </div>
-                            <p className="mt-1 text-xs text-muted">/{memorial.slug}</p>
-                            <p className="mt-2 text-sm text-muted">
-                              {t("approvals.submittedBy", {
-                                name: memorial.submitted_by_name ?? t("approvals.unknownSubmitter"),
-                                submittedAt: submittedAt ?? t("approvals.unknownDate"),
-                              })}
-                            </p>
-                            <p className="mt-1 text-xs text-muted">{t("approvals.lastUpdated", { updatedAt: formatDateTime(memorial.updated_at, user.locale) ?? t("approvals.unknownDate") })}</p>
-                          </div>
-                          <Link href={`/memorial/${memorial.slug}/edit`} className="halvaa-btn-secondary inline-flex cursor-pointer px-4 py-2 text-sm">
-                            {t("approvals.openMemorial")}
-                          </Link>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleReviewMemorial(memorial.id, "APPROVE")}
-                            disabled={reviewingMemorialId === memorial.id}
-                            className="halvaa-btn-secondary cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {reviewingMemorialId === memorial.id ? t("approvals.processing") : t("approvals.approve")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleReviewMemorial(memorial.id, "FEATURE")}
-                            disabled={reviewingMemorialId === memorial.id}
-                            className="halvaa-btn-secondary cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {t("approvals.feature")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleReviewMemorial(memorial.id, "REQUEST_CHANGES")}
-                            disabled={reviewingMemorialId === memorial.id}
-                            className="inline-flex cursor-pointer items-center rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {t("approvals.requestChanges")}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-
-            {moderationQueue.length > 0 ? (
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">{t("moderation.title")}</h3>
-                    <p className="mt-1 text-sm text-muted">{t("moderation.subtitle")}</p>
-                  </div>
-                  <div className="flex gap-3 text-sm text-muted">
-                    <span>{t("moderation.stats.memorials", { count: moderationGroups.length })}</span>
-                    <span>{t("moderation.stats.entries", { count: moderationQueue.length })}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {moderationGroups.map((group) => (
-                    <div key={group.memorialId} className="rounded-2xl border border-border bg-surface px-4 py-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-foreground">{group.memorialName}</p>
-                          <p className="mt-1 text-xs text-muted">/{group.memorialSlug} · {t("moderation.groupCount", { count: group.items.length })}</p>
-                        </div>
-                        <Link href={`/memorial/${group.memorialSlug}/edit`} className="halvaa-btn-secondary inline-flex cursor-pointer px-4 py-2 text-sm">
-                          {t("moderation.openMemorial")}
-                        </Link>
-                      </div>
-
-                      <div className="mt-4 space-y-3">
-                        {group.items.map((entry) => (
-                          <div key={entry.id} className="rounded-2xl border border-border bg-background px-4 py-4">
-                            <p className="text-xs text-muted">{entry.author_name}</p>
-                            <p className="mt-1 text-xs text-muted">{t("moderation.submittedAt", { submittedAt: formatDateTime(entry.created_at, user.locale) ?? t("approvals.unknownDate") })}</p>
-                            <p className="mt-2 text-sm leading-7 text-foreground/85">{entry.message}</p>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => void handleModerateQueueEntry(entry.memorial_id, entry.id, "APPROVED")}
-                                disabled={moderatingId === entry.id}
-                                className="halvaa-btn-secondary cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {moderatingId === entry.id ? t("moderation.processing") : t("moderation.approve")}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleModerateQueueEntry(entry.memorial_id, entry.id, "REJECTED")}
-                                disabled={moderatingId === entry.id}
-                                className="inline-flex cursor-pointer items-center rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {t("moderation.reject")}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+            {memorialsLoading ? <p className="profile-list-message">{t("loading")}</p> : filteredMemorials.length === 0 ? <p className="profile-list-message">{t("emptyMemorials")}</p> : (
+              <div className="profile-memorial-list">
+                {filteredMemorials.map((memorial) => (
+                  <article key={memorial.id}>
+                    <div className="profile-memorial-main">
+                      <span className="profile-memorial-initial">{getName(memorial, user.locale).charAt(0)}</span>
+                      <div><h3>{getName(memorial, user.locale)}</h3><p>/{memorial.slug} · {tStatuses(memorial.status as MemorialStatus)}</p></div>
                     </div>
-                  ))}
-                </div>
+                    <div className="profile-memorial-actions">
+                      <Link href={`/memorial/${memorial.slug}/edit`} className="halvaa-btn-secondary inline-flex">{t("edit")}</Link>
+                      {memorial.status !== "DRAFT" ? <Link href={`/memorial/${memorial.slug}`} className="halvaa-btn-secondary inline-flex">{t("view")}</Link> : null}
+                      {memorial.status === "DRAFT" ? <button type="button" className="halvaa-btn-primary" disabled={publishingMemorialId === memorial.id} onClick={() => void publishDraft(memorial.id)}>{publishingMemorialId === memorial.id ? t("publishingDraft") : t("publishDraft")}</button> : null}
+                      <button type="button" className="profile-delete-button" aria-label={t("removeMemorial")} title={t("removeMemorial")} onClick={() => setDeleteCandidate({ id: memorial.id, name: getName(memorial, user.locale) })}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 7h14M9 7V4h6v3M8 10v8M12 10v8M16 10v8M7 7l1 13h8l1-13" /></svg>
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
-            ) : null}
+            )}
           </div>
-        )}
-      </div>
+        ) : null}
 
-      <div className="rounded-[2rem] border border-border bg-background p-5 shadow-soft sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold text-foreground">{t("myMemorials")}</h2>
-            <p className="mt-1 text-sm text-muted">{t("myMemorialsHint")}</p>
+        {activeTab === "plan" ? (
+          <div className="profile-plan">
+            <div className="profile-section-heading"><div><h2>{t("packageUsage")}</h2><p>{t("planStoreHint")}</p></div><Link href="/store" className="halvaa-btn-primary inline-flex">{t("openStore")}</Link></div>
+            <div className="profile-plan-grid">
+              <div><span>{t("packageMemorials")}</span><strong>{user.entitlements.memorials_used} / {user.entitlements.memorial_limit}</strong><small>{t("packageRemaining", { count: user.entitlements.memorials_remaining })}</small></div>
+              <div><span>{t("packageCustomIds")}</span><strong>{user.entitlements.custom_ids_used} / {user.entitlements.custom_id_limit}</strong><small>{t("packageRemaining", { count: user.entitlements.custom_ids_remaining })}</small></div>
+            </div>
           </div>
-          <Link href="/memorial/create" className="halvaa-btn-primary inline-flex cursor-pointer">
-            {tCommon("create_memorial")}
-          </Link>
-        </div>
+        ) : null}
 
-        {memorialsLoading ? (
-          <p className="mt-6 text-sm text-muted">{t("loading")}</p>
-        ) : memorials.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-dashed border-border p-6 text-sm text-muted">{t("emptyMemorials")}</div>
-        ) : (
-          <div className="mt-6 divide-y divide-border">
-            {memorials.map((memorial) => (
-              <div key={memorial.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-                <div>
-                  <p className="font-semibold text-foreground">{getName(memorial, user.locale)}</p>
-                  <p className="mt-1 text-xs text-muted">/{memorial.slug} · {getStatusLabel(memorial.status)}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Link href={`/memorial/${memorial.slug}/edit`} className="halvaa-btn-secondary inline-flex cursor-pointer px-4 py-2 text-sm">
-                    {t("edit")}
-                  </Link>
-                  <Link href={`/memorial/${memorial.slug}`} className="halvaa-btn-secondary inline-flex cursor-pointer px-4 py-2 text-sm">
-                    {t("view")}
-                  </Link>
-                </div>
-              </div>
-            ))}
+        {activeTab === "account" ? (
+          <div className="profile-account">
+            <div className="profile-section-heading"><div><h2>{t("accountDetails")}</h2><p>{t("accountDetailsHint")}</p></div></div>
+            <div className="profile-account-grid">
+              <label><span>{t("fullName")}</span><input value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label>
+              <label><span>{t("locale")}</span><select value={profileLocale} onChange={(event) => setProfileLocale(event.target.value)}><option value="en">English</option><option value="fa">فارسی</option><option value="ar">العربية</option><option value="zh">中文</option></select></label>
+              <label><span>{t("email")}</span><input type="email" value={profileEmail} disabled={user.locked_email} onChange={(event) => setProfileEmail(event.target.value)} /></label>
+              <label><span>{t("phoneNumber")}</span><input value={profilePhone} disabled={user.locked_phone_number} onChange={(event) => setProfilePhone(event.target.value)} /></label>
+              <label className="sm:col-span-2"><span>{t("address")}</span><input value={profileAddress} onChange={(event) => setProfileAddress(event.target.value)} autoComplete="street-address" /></label>
+            </div>
+            {user.missing_profile_fields.length > 0 ? <p className="profile-missing-fields">{t("missingFields", { fields: user.missing_profile_fields.map((field) => t(`fieldNames.${field}`)).join(", ") })}</p> : null}
+            <div className="profile-account-actions"><button type="button" className="halvaa-btn-primary" disabled={savingProfile} onClick={() => void saveProfile()}>{savingProfile ? t("savingAccount") : t("saveAccount")}</button>{profileMessage ? <span>{profileMessage}</span> : null}</div>
           </div>
-        )}
-      </div>
+        ) : null}
+      </section>
+
+      {avatarUploadProgress > 0 ? <div className="profile-upload-progress"><span style={{ width: `${avatarUploadProgress}%` }} /></div> : null}
+      <MediaPreviewDialog open={avatarPreviewFiles.length > 0} files={avatarPreviewFiles} title={t("avatarPreviewTitle")} hint={t("avatarPreviewHint")} confirmLabel={savingProfile ? t("savingAccount") : t("useProfilePhoto")} cancelLabel={tCommon("cancel")} removeLabel={t("removePhoto")} onConfirm={() => void uploadAvatar()} onClose={closeAvatarPreview} onRemove={closeAvatarPreview} />
+      <ConfirmDialog open={deleteCandidate !== null} title={t("deleteTitle")} description={t("deleteConfirm", { name: deleteCandidate?.name ?? "" })} confirmLabel={t("removeMemorial")} cancelLabel={tCommon("cancel")} busyLabel={t("deleting")} busy={deletingMemorial} tone="danger" onConfirm={() => void deleteMemorial()} onClose={() => setDeleteCandidate(null)} />
     </div>
   );
 }

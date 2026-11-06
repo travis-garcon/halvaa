@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -30,6 +31,10 @@ class NearbyMemorialProperties(BaseModel):
     distance_m: float
     burial_site_name: str | None = None
     burial_plot_name: str | None = None
+    image_url: str | None = None
+    status: str = "PUBLISHED"
+    is_verified: bool = False
+    view_count: int = 0
 
 
 class ExploreMemorialCard(BaseModel):
@@ -42,6 +47,9 @@ class ExploreMemorialCard(BaseModel):
     burial_address: str | None = None
     burial_site_name: str | None = None
     burial_plot_name: str | None = None
+    category: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    filter_tags: dict[str, Any] = Field(default_factory=dict)
     latitude: float | None = None
     longitude: float | None = None
     created_at: datetime
@@ -49,10 +57,16 @@ class ExploreMemorialCard(BaseModel):
     published_at: datetime | None = None
     featured_at: datetime | None = None
     image_url: str | None = None
+    is_verified: bool = False
+    view_count: int = 0
 
 
 class ExploreMemorialFeed(BaseModel):
     items: list[ExploreMemorialCard]
+    total: int = 0
+    limit: int = 30
+    offset: int = 0
+    has_more: bool = False
 
 
 class LandingMemorialCategory(BaseModel):

@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+flag_path="/etc/nginx/halvaa-maintenance.enabled"
+disabled_path="/etc/nginx/halvaa-maintenance.disabled"
+frontend_container="halvaa-frontend-1"
+backend_container="halvaa-backend-1"
+zitadel_container="halvaa-zitadel-1"
+
+usage() {
+    echo "Usage: halvaa-site {down|up|status}"
+}
+
+require_root() {
+    if [[ "$EUID" -ne 0 ]]; then
+        echo "Run this command with sudo." >&2
+        exit 1
+    fi
+}
+
+container_exists() {
+    docker container inspect "$1" >/dev/null 2>&1
+}
+
+container_state() {
+    if container_exists "$1"; then
+        docker container inspect --format '{{.State.Status}}' "$1"
+    else
+        echo "missing"
+    fi
+}
+
+case "${1:-}" in
+    down)
+        require_root
+        if [[ -e "$disabled_path" && ! -e "$flag_path" ]]; then
+            mv "$disabled_path" "$flag_path"
+        else
+            touch "$flag_path"
+        fi
+        chmod 0644 "$flag_path"
+
+        containers_to_stop=()
+        for container in "$frontend_container" "$backend_container" "$zitadel_container"; do
+            if container_exists "$container"; then
+                containers_to_stop+=("$container")
+            fi
+        done
+        if ((${#containers_to_stop[@]})); then
+            docker stop --time 30 "${containers_to_stop[@]}" >/dev/null
+        fi
+
+        echo "Halvaa is DOWN (maintenance mode enabled)."
+        echo "Halvaa frontend, backend, and identity containers are stopped."
+        echo "Other Nginx projects are unchanged."
+        ;;
+    up)
+        require_root
+        containers_to_start=()
+        for container in "$zitadel_container" "$backend_container" "$frontend_container"; do
+            if container_exists "$container"; then
+                containers_to_start+=("$container")
+            else
+                echo "Required container is missing: $container" >&2
+                echo "Halvaa remains in maintenance mode." >&2
+                exit 1
+            fi
+        done
+
+        docker start "${containers_to_start[@]}" >/dev/null
+
+        ready=false
+        for _ in {1..45}; do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1 \
+                && curl -fsS http://127.0.0.1:3000/en >/dev/null 2>&1; then
+                ready=true
+                break
+            fi
+            sleep 1
+        done
+
+        if [[ "$ready" != true ]]; then
+            echo "Halvaa containers started but did not become ready in time." >&2
+            echo "Maintenance mode remains enabled for safety." >&2
+            exit 1
+        fi
+
+        if [[ -e "$flag_path" ]]; then
+            mv "$flag_path" "$disabled_path"
+        fi
+        echo "Halvaa is UP (maintenance mode disabled)."
+        ;;
+    status)
+        if [[ -e "$flag_path" ]]; then
+            echo "Halvaa is DOWN (maintenance mode enabled)."
+        else
+            echo "Halvaa is UP (maintenance mode disabled)."
+        fi
+        if command -v docker >/dev/null 2>&1; then
+            echo "Frontend container: $(container_state "$frontend_container")"
+            echo "Backend container: $(container_state "$backend_container")"
+            echo "Identity container: $(container_state "$zitadel_container")"
+        fi
+        ;;
+    *)
+        usage
+        exit 2
+        ;;
+esac

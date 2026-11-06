@@ -1,0 +1,60 @@
+--- /etc/nginx/sites-available/halvaa
++++ /etc/nginx/sites-available/halvaa
+@@ -20,6 +20,9 @@
+     # before they reached the API.
+     client_max_body_size 110m;
+ 
++    # Halvaa-only maintenance response. Shared project routes do not use it.
++    include /etc/nginx/snippets/halvaa-maintenance-location.conf;
++
+     # Isolated Zeman contract app; all routes remain under /zeman/.
+     include /etc/nginx/snippets/zeman.conf;
+ 
+@@ -81,6 +84,7 @@
+     }
+ 
+     location /api/ {
++        include /etc/nginx/snippets/halvaa-maintenance-guard.conf;
+         proxy_pass http://127.0.0.1:8000/api/;
+         proxy_http_version 1.1;
+         proxy_set_header Host $host;
+@@ -90,6 +94,7 @@
+     }
+ 
+     location /.well-known/ {
++        include /etc/nginx/snippets/halvaa-maintenance-guard.conf;
+         proxy_pass http://127.0.0.1:8080/.well-known/;
+         proxy_http_version 1.1;
+         proxy_set_header Host $host;
+@@ -99,6 +104,7 @@
+     }
+ 
+     location /oauth/ {
++        include /etc/nginx/snippets/halvaa-maintenance-guard.conf;
+         proxy_pass http://127.0.0.1:8080/oauth/;
+         proxy_http_version 1.1;
+         proxy_set_header Host $host;
+@@ -108,6 +114,7 @@
+     }
+ 
+     location /ui/ {
++        include /etc/nginx/snippets/halvaa-maintenance-guard.conf;
+         proxy_pass http://127.0.0.1:8080/ui/;
+         proxy_http_version 1.1;
+         proxy_set_header Host $host;
+@@ -117,6 +124,7 @@
+     }
+ 
+     location /debug/ {
++        include /etc/nginx/snippets/halvaa-maintenance-guard.conf;
+         proxy_pass http://127.0.0.1:8080/debug/;
+         proxy_http_version 1.1;
+         proxy_set_header Host $host;
+@@ -189,6 +197,7 @@
+     }
+ 
+     location / {
++        include /etc/nginx/snippets/halvaa-maintenance-guard.conf;
+         proxy_pass http://127.0.0.1:3000;
+         proxy_http_version 1.1;
+         proxy_set_header Host $host;

@@ -1,6 +1,7 @@
 import uuid
 from io import BytesIO
 from pathlib import Path
+import shutil
 
 from PIL import Image
 from sqlmodel import Session
@@ -71,16 +72,18 @@ def save_upload_and_enqueue(
     category: MediaCategory,
     file_size: int,
 ) -> MediaAsset:
+    asset_id = uuid.uuid4()
+    original_path, _ = _storage_paths(memorial_id, asset_id, extension)
     asset = MediaAsset(
+        id=asset_id,
         memorial_id=memorial_id,
         media_type=media_type,
         category=category,
+        original_storage_key=str(original_path),
         mime_type=mime_type,
         file_size_bytes=file_size,
         processing_status=MediaProcessingStatus.PENDING,
     )
-    original_path, _ = _storage_paths(memorial_id, asset.id, extension)
-    asset.original_storage_key = str(original_path)
     original_path.write_bytes(validated_content)
 
     session.add(asset)
@@ -92,3 +95,24 @@ def save_upload_and_enqueue(
 def process_media_thumbnail_task(asset_id: uuid.UUID) -> None:
     with Session(engine) as session:
         process_media_thumbnail(session, asset_id)
+
+
+def delete_media_storage(asset: MediaAsset) -> None:
+    settings = get_settings()
+    upload_root = Path(settings.upload_dir).resolve()
+    storage_key = asset.original_storage_key
+    if storage_key.startswith(("http://", "https://", "/images/")):
+        return
+
+    original_path = Path(storage_key).resolve()
+    if not original_path.is_relative_to(upload_root):
+        return
+    shutil.rmtree(original_path.parent, ignore_errors=True)
+
+
+def delete_memorial_storage(memorial_id: uuid.UUID) -> None:
+    settings = get_settings()
+    upload_root = Path(settings.upload_dir).resolve()
+    memorial_root = (upload_root / "memorials" / str(memorial_id)).resolve()
+    if memorial_root.is_relative_to(upload_root):
+        shutil.rmtree(memorial_root, ignore_errors=True)

@@ -12,6 +12,22 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 
+@pytest.fixture(autouse=True)
+def isolate_api_limits(monkeypatch):
+    from app.api.routes import memorials as memorial_routes
+    from app.core.limiter import limiter
+
+    monkeypatch.setattr(memorial_routes, "has_memorial_slot", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(memorial_routes, "has_custom_id_slot", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(memorial_routes, "consume_custom_id_slot", lambda *_args, **_kwargs: None)
+    previous_enabled = limiter.enabled
+    limiter.enabled = False
+    try:
+        yield
+    finally:
+        limiter.enabled = previous_enabled
+
+
 @pytest.fixture
 def engine():
     from app.core.database import engine as app_engine
@@ -36,6 +52,11 @@ def engine():
             connection.execute(text("ALTER TABLE memorials ADD COLUMN burial_site_name VARCHAR(255)"))
         if "burial_plot_name" not in memorial_columns:
             connection.execute(text("ALTER TABLE memorials ADD COLUMN burial_plot_name VARCHAR(255)"))
+        if "view_count" not in memorial_columns:
+            connection.execute(text("ALTER TABLE memorials ADD COLUMN view_count BIGINT NOT NULL DEFAULT 0"))
+        user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
+        if "address" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN address VARCHAR(512)"))
 
     yield app_engine
 
@@ -74,6 +95,8 @@ def test_user(db_session: Session):
         email="test-fixture@example.com",
         full_name="Test Fixture User",
         hashed_password=hash_password("testpass123"),
+        phone_number="+15555550100",
+        address="100 Test Street, Test City",
     )
     db_session.add(user)
     db_session.flush()
@@ -88,6 +111,7 @@ def test_memorial(db_session: Session, test_user):
     from app.models.memorial import Memorial
 
     memorial = Memorial(
+        public_id="integration-test-memorial",
         slug="integration-test-memorial",
         status=MemorialStatus.PUBLISHED,
         created_by_id=test_user.id,

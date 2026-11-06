@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
 
     upload_dir: str = "uploads"
+    public_api_base_url: str = "http://localhost:8000"
     max_image_bytes: int = 10 * 1024 * 1024
     max_video_bytes: int = 100 * 1024 * 1024
     max_document_bytes: int = 25 * 1024 * 1024
@@ -49,16 +50,26 @@ class Settings(BaseSettings):
     smtp_from_name: str = "Halvaa"
     smtp_use_tls: bool = True
     smtp_helo_domain: str = "halvaa.app"
-    smtp_direct_delivery: bool = True
+    smtp_direct_delivery: bool = False
 
     stripe_secret_key: str | None = None
+    stripe_webhook_secret: str | None = None
     stripe_success_url: str = "http://localhost:3000/en/store?payment=success"
     stripe_cancel_url: str = "http://localhost:3000/en/store?payment=cancel"
     zarinpal_merchant_id: str | None = None
-    zarinpal_callback_url: str = "http://localhost:3000/fa/store?payment=verify"
+    zarinpal_callback_url: str = "http://localhost:8000/api/v1/store/zarinpal/verify"
     zarinpal_sandbox: bool = True
+    zarinpal_description: str = "Halvaa package purchase"
+    coinbase_commerce_api_key: str | None = None
+    coinbase_commerce_webhook_secret: str | None = None
+    payment_frontend_base_url: str = "http://localhost:3000"
+    payment_test_mode: bool = False
+    translation_provider: Literal["disabled", "libretranslate"] = "disabled"
+    libretranslate_url: str = "https://libretranslate.de"
+    libretranslate_api_key: str | None = None
 
     mapbox_access_token: str | None = None
+    enforce_memorial_slot_limit: bool | None = None
 
     google_client_id: str | None = None
     google_client_secret: str | None = None
@@ -87,6 +98,12 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def should_enforce_memorial_slot_limit(self) -> bool:
+        if self.enforce_memorial_slot_limit is not None:
+            return self.enforce_memorial_slot_limit
+        return self.is_production
 
 
 @lru_cache

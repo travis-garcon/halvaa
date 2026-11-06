@@ -1,21 +1,29 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { useLocale, useTranslations } from "next-intl";
 
 import { useAuth } from "@/hooks/use-auth";
-import { Link } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/routing";
 import { api, ApiError } from "@/lib/api-client";
-import type { FamilyMember, MemorialCollaborator, MemorialReviewActivityItem, TimelineEventPublic, TimelineEventType } from "@/types/memorial";
+import { invalidateExploreAfterMemorialDelete } from "@/lib/explore-cache";
+import { joinList, splitList } from "@/lib/memorial-form";
+import { MapboxLocationPicker, type PickedLocation } from "@/components/ui/MapboxLocationPicker";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FieldLabel } from "@/components/ui/InfoTip";
+import { LocalizedDateInput } from "@/components/ui/LocalizedDateInput";
+import { MediaPreviewDialog, preparePreviewFiles, type PreviewFile } from "@/components/ui/MediaPreviewDialog";
+import { notifyApp } from "@/components/ui/AppNotifications";
+import type { FamilyMember, MemorialCollaborator, MemorialLocation, MemorialReviewActivityItem, TimelineEventPublic, TimelineEventType } from "@/types/memorial";
 
 type EditMemorialFormProps = {
   slug: string;
 };
 
-const MEDIA_CATEGORIES = ["GALLERY", "DOCUMENT", "WILL"] as const;
 const TIMELINE_MEDIA_CATEGORY = "TIMELINE" as const;
+const EDIT_STEPS = ["details", "media", "manage"] as const;
 
 function getMediaLabel(url: string): string {
   try {
@@ -31,6 +39,7 @@ function getMediaMeta(item: { translations: Record<string, Record<string, string
   const meta = item.translations?.meta ?? {};
   return {
     assetKind: meta.asset_kind,
+    headerRole: meta.header_role,
   };
 }
 
@@ -69,6 +78,7 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
   const tCommon = useTranslations("common");
   const tTimeline = useTranslations("timeline");
   const locale = useLocale();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { data: memorial, isLoading, mutate: mutateMemorial } = useSWR(isAuthenticated ? ["edit-memorial", slug] : null, () => api.memorialBySlug(slug, true));
@@ -93,21 +103,47 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
   const timelineMediaItems = mediaItems.filter((item) => item.category === TIMELINE_MEDIA_CATEGORY);
 
   const [name, setName] = useState("");
+  const [editLocale, setEditLocale] = useState(locale);
   const [biography, setBiography] = useState("");
   const [epitaph, setEpitaph] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [deathDate, setDeathDate] = useState("");
+  const [burialAddress, setBurialAddress] = useState("");
   const [burialSiteName, setBurialSiteName] = useState("");
   const [burialPlotName, setBurialPlotName] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [category, setCategory] = useState("");
+  const [gender, setGender] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [nationality, setNationality] = useState("");
+  const [religion, setReligion] = useState("");
+  const [languages, setLanguages] = useState("");
+  const [countries, setCountries] = useState("");
+  const [cities, setCities] = useState("");
+  const [birthPlace, setBirthPlace] = useState("");
+  const [deathPlace, setDeathPlace] = useState("");
+  const [placesLived, setPlacesLived] = useState("");
+  const [tags, setTags] = useState("");
+  const [locations, setLocations] = useState<MemorialLocation[]>([]);
+  const [pickerTarget, setPickerTarget] = useState<"primary" | number | null>(null);
   const [familyTree, setFamilyTree] = useState<FamilyMember[]>([]);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editStep, setEditStep] = useState(0);
+  const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [loadedMemorialId, setLoadedMemorialId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadCategory, setUploadCategory] = useState("GALLERY");
+  const [uploadCategory] = useState("GALLERY");
+  const [previewFiles, setPreviewFiles] = useState<PreviewFile[]>([]);
+  const [previewCategory, setPreviewCategory] = useState("GALLERY");
+  const [previewHeaderRole, setPreviewHeaderRole] = useState<"portrait" | "banner" | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [mediaDrafts, setMediaDrafts] = useState<Record<string, { title: string; description: string; category: string }>>({});
+  const [updatingHeaderRoleId, setUpdatingHeaderRoleId] = useState<string | null>(null);
+  const [dragTarget, setDragTarget] = useState<"library" | "timeline" | null>(null);
   const [collaboratorEmail, setCollaboratorEmail] = useState("");
   const [collaboratorRole, setCollaboratorRole] = useState<MemorialCollaborator["role"]>("EDITOR");
   const [inviting, setInviting] = useState(false);
@@ -131,6 +167,14 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
   const [timelineMessage, setTimelineMessage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [visibilityDialogOpen, setVisibilityDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingMemorial, setDeletingMemorial] = useState(false);
+  const autosaveReadyRef = useRef(false);
+  const availableTranslationLocales = memorial
+    ? Array.from(new Set([locale, editLocale, "en", "fa", "ar", "zh", ...Object.keys(memorial.translations ?? {})]))
+    : [locale];
 
   const resetTimelineForm = () => {
     setTimelineEventId(null);
@@ -145,22 +189,50 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
 
   useEffect(() => {
     if (!memorial) return;
-    const translation = memorial.translations?.[locale] ?? memorial.translations?.en ?? {};
-    /* eslint-disable react-hooks/set-state-in-effect */
+    const translation = memorial.translations?.[editLocale] ?? memorial.translations?.en ?? {};
     setName(translation.name ?? "");
     setBiography(translation.biography ?? "");
     setEpitaph(translation.epitaph ?? "");
     setAnnouncement(translation.announcement ?? "");
     setBirthDate(memorial.birth_date ?? "");
     setDeathDate(memorial.death_date ?? "");
+    setBurialAddress(memorial.burial_address ?? "");
     setBurialSiteName(memorial.burial_site_name ?? "");
     setBurialPlotName(memorial.burial_plot_name ?? "");
     setQrCodeUrl(memorial.qr_code_url ?? "");
-    setFamilyTree(memorial.family_tree ?? []);
+    setCategory(memorial.category ?? "");
+    setGender(typeof memorial.filter_tags?.gender === "string" ? memorial.filter_tags.gender : "");
+    setCountries(joinList(memorial.filter_tags?.countries));
+    setCities(joinList(memorial.filter_tags?.cities));
+    setTags(joinList(memorial.filter_tags?.tags));
+    setBirthPlace(typeof memorial.metadata?.birth_place === "string" ? memorial.metadata.birth_place : "");
+    setDeathPlace(typeof memorial.metadata?.death_place === "string" ? memorial.metadata.death_place : "");
+    setOccupation(typeof memorial.metadata?.occupation === "string" ? memorial.metadata.occupation : "");
+    setNationality(typeof memorial.metadata?.nationality === "string" ? memorial.metadata.nationality : "");
+    setReligion(typeof memorial.metadata?.religion === "string" ? memorial.metadata.religion : "");
+    setLanguages(joinList(memorial.metadata?.languages));
+    setPlacesLived(joinList(memorial.metadata?.places_lived));
+    setLocations(memorial.locations && memorial.locations.length > 0 ? memorial.locations : [{ kind: "burial", label: t("burialSiteName") }]);
+    setFamilyTree((memorial.family_tree ?? []).map((member) => ({ ...member, id: member.id ?? crypto.randomUUID() })));
     setLatitude(memorial.latitude?.toString() ?? "");
     setLongitude(memorial.longitude?.toString() ?? "");
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [locale, memorial]);
+    setLoadedMemorialId(memorial.id);
+    autosaveReadyRef.current = true;
+  }, [editLocale, memorial, t]);
+
+  useEffect(() => {
+    setMediaDrafts((current) => {
+      const next = { ...current };
+      mediaItems.forEach((item) => {
+        next[item.id] = next[item.id] ?? {
+          title: item.title ?? "",
+          description: item.description ?? "",
+          category: item.category,
+        };
+      });
+      return next;
+    });
+  }, [mediaItems]);
 
   const buildMemorialPayload = () => {
     if (!memorial) {
@@ -170,15 +242,33 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
     return {
       birth_date: birthDate || null,
       death_date: deathDate || null,
+      burial_address: burialAddress.trim() || null,
       burial_site_name: burialSiteName.trim() || null,
       burial_plot_name: burialPlotName.trim() || null,
       qr_code_url: qrCodeUrl.trim() || null,
+      category: category.trim() || null,
+      metadata: {
+        birth_place: birthPlace.trim() || null,
+        death_place: deathPlace.trim() || null,
+        occupation: occupation.trim() || null,
+        nationality: nationality.trim() || null,
+        religion: religion.trim() || null,
+        languages: splitList(languages),
+        places_lived: splitList(placesLived),
+      },
+      filter_tags: {
+        gender: gender.trim() || null,
+        countries: splitList(countries),
+        cities: splitList(cities),
+        tags: splitList(tags),
+      },
+      locations: locations.filter((location) => location.kind || location.label || location.address || location.latitude || location.longitude),
       family_tree: familyTree.filter((member) => member.name.trim() && member.relation.trim()),
       latitude: latitude ? Number(latitude) : null,
       longitude: longitude ? Number(longitude) : null,
       translations: {
         ...memorial.translations,
-        [locale]: {
+        [editLocale]: {
           name: name.trim(),
           ...(biography.trim() ? { biography: biography.trim() } : {}),
           ...(epitaph.trim() ? { epitaph: epitaph.trim() } : {}),
@@ -199,6 +289,52 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
     return api.updateMemorial(memorial.id, payload);
   };
 
+  useEffect(() => {
+    if (!memorial || loadedMemorialId !== memorial.id || !autosaveReadyRef.current || saving) return;
+    const timer = window.setTimeout(() => {
+      const payload = buildMemorialPayload();
+      if (!payload) return;
+      setAutosaveState("saving");
+      void api.updateMemorial(memorial.id, payload)
+        .then(() => setAutosaveState("saved"))
+        .catch(() => setAutosaveState("error"));
+    }, 1400);
+    return () => window.clearTimeout(timer);
+    // The payload builder reads exactly the state values listed below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    announcement,
+    biography,
+    birthDate,
+    birthPlace,
+    burialAddress,
+    burialPlotName,
+    burialSiteName,
+    category,
+    cities,
+    countries,
+    deathDate,
+    deathPlace,
+    editLocale,
+    epitaph,
+    familyTree,
+    gender,
+    languages,
+    latitude,
+    loadedMemorialId,
+    locations,
+    longitude,
+    memorial,
+    name,
+    nationality,
+    occupation,
+    placesLived,
+    qrCodeUrl,
+    religion,
+    saving,
+    tags,
+  ]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!memorial) return;
@@ -210,6 +346,7 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
       await persistMemorialDetails();
       await mutateMemorial();
       setSaveMessage(t("saveSuccess"));
+      notifyApp({ message: t("saveSuccess"), tone: "success" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("error"));
     } finally {
@@ -240,31 +377,148 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
     }
   };
 
+  const handleVisibilityToggle = async () => {
+    if (!memorial) return;
+    const nextStatus = memorial.status === "DEACTIVATED" ? "DRAFT" : "DEACTIVATED";
+
+    setSaving(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      await persistMemorialDetails();
+      await api.updateMemorialStatus(memorial.id, nextStatus);
+      await mutateMemorial();
+      setSaveMessage(memorial.status === "DEACTIVATED" ? t("reactivateSuccess") : t("deactivateSuccess"));
+      setVisibilityDialogOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("visibilityError"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const updateFamilyMember = (index: number, next: Partial<FamilyMember>) => {
     setFamilyTree((current) => current.map((member, currentIndex) => (currentIndex === index ? { ...member, ...next } : member)));
   };
 
   const addFamilyMember = () => {
-    setFamilyTree((current) => [...current, { name: "", relation: "", years: "" }]);
+    setFamilyTree((current) => [...current, { id: crypto.randomUUID(), name: "", relation: "", years: "" }]);
   };
 
   const removeFamilyMember = (index: number) => {
     setFamilyTree((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
 
-  const handleUpload = async (file: File | null, category = uploadCategory) => {
-    if (!file || !memorial) return;
+  const updateLocation = (index: number, next: Partial<MemorialLocation>) => {
+    setLocations((current) => current.map((location, currentIndex) => (currentIndex === index ? { ...location, ...next } : location)));
+  };
+
+  const addLocation = () => {
+    setLocations((current) => [...current, { kind: "custom", label: "" }]);
+  };
+
+  const removeLocation = (index: number) => {
+    setLocations((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const selectedPickerValue =
+    pickerTarget === "primary"
+      ? latitude && longitude
+        ? { latitude: Number(latitude), longitude: Number(longitude) }
+        : null
+      : typeof pickerTarget === "number" && locations[pickerTarget]?.latitude && locations[pickerTarget]?.longitude
+        ? { latitude: Number(locations[pickerTarget].latitude), longitude: Number(locations[pickerTarget].longitude) }
+        : null;
+
+  const handleLocationPick = (location: PickedLocation) => {
+    if (pickerTarget === "primary") {
+      setLatitude(String(location.latitude));
+      setLongitude(String(location.longitude));
+    } else if (typeof pickerTarget === "number") {
+      updateLocation(pickerTarget, location);
+    }
+  };
+
+  const queueUploadFiles = (
+    files: FileList | File[] | null,
+    category = uploadCategory,
+    headerRole: "portrait" | "banner" | null = null,
+  ) => {
+    if (!files || files.length === 0) return;
+    const selected = Array.from(files);
+    setPreviewCategory(headerRole === "portrait" ? "AVATAR" : category);
+    setPreviewHeaderRole(headerRole);
+    setPreviewFiles(
+      preparePreviewFiles(
+        headerRole ? selected.slice(0, 1) : selected,
+        t("uploadInvalidType"),
+        (size) => t("uploadTooLarge", { size }),
+      ),
+    );
+  };
+
+  const closeUploadPreview = () => {
+    previewFiles.forEach((item) => {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    });
+    setPreviewFiles([]);
+    setUploadProgress({});
+  };
+
+  const removePreviewFile = (id: string) => {
+    setPreviewFiles((current) => {
+      const selected = current.find((item) => item.id === id);
+      if (selected?.previewUrl) URL.revokeObjectURL(selected.previewUrl);
+      return current.filter((item) => item.id !== id);
+    });
+  };
+
+  const handleUploadFiles = async () => {
+    if (previewFiles.length === 0 || !memorial) return;
     setUploading(true);
     setUploadMessage(null);
     setError(null);
     try {
-      await api.uploadMedia(memorial.id, file, category);
+      for (const item of previewFiles) {
+        const uploaded = await api.uploadMedia(memorial.id, item.file, previewCategory, (progress) => {
+          setUploadProgress((current) => ({ ...current, [item.id]: progress }));
+        });
+        if (previewHeaderRole) {
+          await api.updateMedia(memorial.id, uploaded.id, {
+            translations: { meta: { header_role: previewHeaderRole } },
+          });
+        }
+      }
       setUploadMessage(t("uploadSuccess"));
       await mutateMedia();
+      closeUploadPreview();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("uploadError"));
     } finally {
       setUploading(false);
+      setDragTarget(null);
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLLabelElement>, category: string, headerRole: "portrait" | "banner" | null = null) => {
+    event.preventDefault();
+    setDragTarget(null);
+    queueUploadFiles(Array.from(event.dataTransfer.files), category, headerRole);
+  };
+
+  const handleDeleteMemorial = async () => {
+    if (!memorial) return;
+    setDeletingMemorial(true);
+    setError(null);
+    try {
+      await api.deleteMemorial(memorial.id);
+      await invalidateExploreAfterMemorialDelete(memorial.id);
+      notifyApp({ message: t("deleteSuccess"), tone: "success" });
+      router.push("/profile");
+    } catch (deleteError) {
+      setError(deleteError instanceof ApiError ? deleteError.message : t("deleteError"));
+    } finally {
+      setDeletingMemorial(false);
     }
   };
 
@@ -380,39 +634,18 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
     }
   };
 
-  const handleUpdateMediaCategory = async (mediaId: string, category: string) => {
-    if (!memorial) return;
-    setUpdatingMediaId(mediaId);
-    setUploadMessage(null);
-    setError(null);
-
-    try {
-      await api.updateMediaCategory(memorial.id, mediaId, category);
-      setUploadMessage(t("mediaCategorySuccess"));
-      await mutateMedia();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("mediaCategoryError"));
-    } finally {
-      setUpdatingMediaId(null);
-    }
-  };
-
   const handleEditMediaDetails = async (mediaId: string) => {
     if (!memorial) return;
-    const item = mediaItems.find((entry) => entry.id === mediaId);
-    if (!item) return;
-
-    const nextTitle = window.prompt(t("mediaTitlePrompt"), item.title ?? "");
-    if (nextTitle === null) return;
-    const nextDescription = window.prompt(t("mediaDescriptionPrompt"), item.description ?? "");
-    if (nextDescription === null) return;
+    const draft = mediaDrafts[mediaId];
+    if (!draft) return;
 
     setUpdatingMediaId(mediaId);
     setError(null);
     try {
       await api.updateMedia(memorial.id, mediaId, {
-        title: nextTitle.trim() || null,
-        description: nextDescription.trim() || null,
+        category: draft.category,
+        title: draft.title.trim() || null,
+        description: draft.description.trim() || null,
       });
       setUploadMessage(t("mediaDetailsSuccess"));
       await mutateMedia();
@@ -420,6 +653,53 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
       setError(err instanceof ApiError ? err.message : t("mediaDetailsError"));
     } finally {
       setUpdatingMediaId(null);
+    }
+  };
+
+  const handleSetHeaderRole = async (mediaId: string, role: "portrait" | "banner") => {
+    if (!memorial) return;
+    setUpdatingHeaderRoleId(mediaId);
+    setError(null);
+    try {
+      const targets = libraryMediaItems.filter((item) => item.media_type === "IMAGE" && (item.id === mediaId || getMediaMeta(item).headerRole === role));
+      await Promise.all(
+        targets.map((item) =>
+          api.updateMedia(memorial.id, item.id, {
+            translations: {
+              ...item.translations,
+              meta: {
+                ...(item.translations.meta ?? {}),
+                ...(item.id === mediaId ? { header_role: role } : { header_role: "" }),
+              },
+            },
+          }),
+        ),
+      );
+      setUploadMessage(role === "portrait" ? t("portraitSaved") : t("bannerSaved"));
+      await mutateMedia();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("mediaDetailsError"));
+    } finally {
+      setUpdatingHeaderRoleId(null);
+    }
+  };
+
+  const handleTranslateMemorial = async () => {
+    if (!memorial) return;
+    setTranslating(true);
+    setError(null);
+    try {
+      await persistMemorialDetails();
+      await api.translateMemorial(memorial.id, {
+        source_locale: editLocale,
+        target_locales: ["en", "fa", "ar", "zh"],
+      });
+      await mutateMemorial();
+      setSaveMessage(t("translationStarted"));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("translationError"));
+    } finally {
+      setTranslating(false);
     }
   };
 
@@ -555,26 +835,81 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
     : searchParams.get("notice") === "draft-created"
       ? t("draftCreated")
       : null;
+  const dateLabels = {
+    persian: t("calendar.persian"),
+    gregorian: t("calendar.gregorian"),
+    year: t("calendar.year"),
+    month: t("calendar.month"),
+    day: t("calendar.day"),
+    converted: t("calendar.converted"),
+    empty: t("calendar.empty"),
+  };
+  const autosaveLabel = autosaveState === "saving"
+    ? t("autosave.saving")
+    : autosaveState === "saved"
+      ? t("autosave.saved")
+      : autosaveState === "error"
+        ? t("autosave.error")
+        : t("autosave.waiting");
+  const selectedPortrait = libraryMediaItems.find((item) => getMediaMeta(item).headerRole === "portrait");
+  const selectedBanner = libraryMediaItems.find((item) => getMediaMeta(item).headerRole === "banner");
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 rounded-[2rem] border border-border bg-background p-6 shadow-soft sm:p-8">
+    <>
+    <form onSubmit={handleSubmit} className="space-y-5 rounded-lg border border-border bg-background p-4 shadow-soft sm:p-7">
+      <div className="border-b border-border pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-foreground">{t("wizardTitle")}</p>
+          <p className="text-xs text-muted">{autosaveLabel}</p>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {EDIT_STEPS.map((stepKey, index) => (
+            <button key={stepKey} type="button" onClick={() => setEditStep(index)} className={["memorial-step-tab", editStep === index ? "is-active" : ""].join(" ")}>
+              <span>{index + 1}</span>
+              <strong>{t(`steps.${stepKey}`)}</strong>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {editStep === 0 ? (
+        <>
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-foreground">{t("name")}</span>
+        <FieldLabel label={t("name")} help={t("help.name")} />
         <input required value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
       </label>
 
+      <div className="rounded-2xl border border-border bg-surface p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">{t("translationEditorTitle")}</p>
+            <p className="mt-1 text-xs text-muted">{t("translationEditorHint")}</p>
+          </div>
+          <select value={editLocale} onChange={(event) => setEditLocale(event.target.value)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground">
+            {availableTranslationLocales.map((itemLocale) => (
+              <option key={itemLocale} value={itemLocale}>{itemLocale.toUpperCase()}</option>
+            ))}
+          </select>
+        </div>
+        <p className="mt-3 text-xs text-muted">{t("translationStatusHint")}</p>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-foreground">{t("birthDate")}</span>
-          <input type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+          <FieldLabel label={t("birthDate")} help={t("help.birthDate")} />
+          <LocalizedDateInput locale={locale} value={birthDate} onChange={setBirthDate} labels={dateLabels} />
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-foreground">{t("deathDate")}</span>
-          <input type="date" value={deathDate} onChange={(event) => setDeathDate(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+          <FieldLabel label={t("deathDate")} help={t("help.deathDate")} />
+          <LocalizedDateInput locale={locale} value={deathDate} onChange={setDeathDate} labels={dateLabels} />
         </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-foreground">{t("burialAddress")}</span>
+          <input value={burialAddress} onChange={(event) => setBurialAddress(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+        </label>
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-foreground">{t("burialSiteName")}</span>
           <input value={burialSiteName} onChange={(event) => setBurialSiteName(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
@@ -586,12 +921,12 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
       </div>
 
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-foreground">{t("biography")}</span>
+        <FieldLabel label={t("biography")} help={t("help.biography")} />
         <textarea rows={5} value={biography} onChange={(event) => setBiography(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
       </label>
 
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-foreground">{t("epitaph")}</span>
+        <FieldLabel label={t("epitaph")} help={t("help.epitaph")} />
         <input value={epitaph} onChange={(event) => setEpitaph(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
       </label>
 
@@ -599,6 +934,35 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
         <span className="mb-1 block font-medium text-foreground">{t("announcement")}</span>
         <textarea rows={3} value={announcement} onChange={(event) => setAnnouncement(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
       </label>
+
+      <details className="rounded-lg border border-border bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-foreground">{t("optionalDetails")}</summary>
+      <div className="mt-4">
+        <p className="text-sm font-medium text-foreground">{t("metadataTitle")}</p>
+        <p className="mt-1 text-xs text-muted">{t("metadataHint")}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {[
+            ["category", category, setCategory],
+            ["gender", gender, setGender],
+            ["occupation", occupation, setOccupation],
+            ["nationality", nationality, setNationality],
+            ["religion", religion, setReligion],
+            ["birthPlace", birthPlace, setBirthPlace],
+            ["deathPlace", deathPlace, setDeathPlace],
+            ["languages", languages, setLanguages],
+            ["countries", countries, setCountries],
+            ["cities", cities, setCities],
+            ["placesLived", placesLived, setPlacesLived],
+            ["tags", tags, setTags],
+          ].map(([key, value, setter]) => (
+            <label key={key as string} className="block text-sm">
+              <span className="mb-1 block font-medium text-foreground">{t(key as string)}</span>
+              <input value={value as string} onChange={(event) => (setter as (next: string) => void)(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+            </label>
+          ))}
+        </div>
+      </div>
+      </details>
 
       <div className="rounded-2xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -613,7 +977,7 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
         {familyTree.length === 0 ? <p className="mt-4 rounded-xl border border-dashed border-border bg-background px-4 py-4 text-sm text-muted">{t("familyTreeEmpty")}</p> : null}
         <div className="mt-4 space-y-3">
           {familyTree.map((member, index) => (
-            <div key={`${member.name}-${index}`} className="grid gap-3 rounded-xl border border-border bg-background px-4 py-4 sm:grid-cols-[minmax(0,1fr)_180px_140px_auto]">
+            <div key={member.id ?? `family-${index}`} className="grid gap-3 rounded-xl border border-border bg-background px-4 py-4 sm:grid-cols-[minmax(0,1fr)_180px_140px_auto]">
               <input value={member.name} onChange={(event) => updateFamilyMember(index, { name: event.target.value })} placeholder={t("familyTreeName")}
                 className="rounded-xl border border-border px-3 py-2 text-sm outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
               <input value={member.relation} onChange={(event) => updateFamilyMember(index, { relation: event.target.value })} placeholder={t("familyTreeRelation")}
@@ -627,11 +991,6 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
           ))}
         </div>
       </div>
-
-      <label className="block text-sm">
-        <span className="mb-1 block font-medium text-foreground">{t("qrCodeUrl")}</span>
-        <input value={qrCodeUrl} onChange={(event) => setQrCodeUrl(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
-      </label>
 
       <div className="rounded-2xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -651,15 +1010,10 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-foreground">{t("latitude")}</span>
-          <input type="number" step="any" value={latitude} onChange={(event) => setLatitude(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-foreground">{t("longitude")}</span>
-          <input type="number" step="any" value={longitude} onChange={(event) => setLongitude(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
-        </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <button type="button" onClick={() => setPickerTarget("primary")} className="halvaa-btn-secondary cursor-pointer self-end">
+          {t("pickLocation")}
+        </button>
         <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
           <p className="font-medium text-foreground">{t("status")}</p>
           <p className="mt-2 inline-flex rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted">{currentStatusLabel}</p>
@@ -670,12 +1024,51 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
                 ? t("statusHints.PENDING_APPROVAL")
                 : memorial.status === "PUBLISHED"
                   ? t("statusHints.PUBLISHED")
-                  : t("statusHints.FEATURED")}
+                  : memorial.status === "FEATURED"
+                    ? t("statusHints.FEATURED")
+                    : t("statusHints.DEACTIVATED")}
           </p>
           {lastReviewedAt && lastReviewDecisionLabel ? <p className="mt-2 text-xs text-muted">{t("lastReviewed", { decision: lastReviewDecisionLabel, reviewedAt: lastReviewedAt, reviewer: lastReviewerName })}</p> : null}
+          {isOwner ? (
+            <button type="button" onClick={() => setVisibilityDialogOpen(true)} disabled={saving} className="mt-3 inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
+              {memorial.status === "DEACTIVATED" ? t("reactivateMemorial") : t("deactivateMemorial")}
+            </button>
+          ) : null}
         </div>
       </div>
 
+      <div className="rounded-2xl border border-border bg-surface p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">{t("locationsTitle")}</p>
+            <p className="mt-1 text-xs text-muted">{t("locationsHint")}</p>
+          </div>
+          <button type="button" onClick={addLocation} className="halvaa-btn-secondary cursor-pointer whitespace-nowrap">
+            {t("addLocation")}
+          </button>
+        </div>
+        <div className="mt-4 space-y-3">
+          {locations.map((location, index) => (
+            <div key={`${location.kind}-${index}`} className="grid gap-3 rounded-xl border border-border bg-background px-4 py-4 sm:grid-cols-3">
+              <input value={location.kind} onChange={(event) => updateLocation(index, { kind: event.target.value })} placeholder={t("locationKind")} className="rounded-xl border border-border px-3 py-2 text-sm outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+              <input value={location.label ?? ""} onChange={(event) => updateLocation(index, { label: event.target.value })} placeholder={t("locationLabel")} className="rounded-xl border border-border px-3 py-2 text-sm outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+              <input value={location.address ?? ""} onChange={(event) => updateLocation(index, { address: event.target.value })} placeholder={t("locationAddress")} className="rounded-xl border border-border px-3 py-2 text-sm outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+              <input value={location.city ?? ""} onChange={(event) => updateLocation(index, { city: event.target.value })} placeholder={t("city")} className="rounded-xl border border-border px-3 py-2 text-sm outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+              <input value={location.country ?? ""} onChange={(event) => updateLocation(index, { country: event.target.value })} placeholder={t("country")} className="rounded-xl border border-border px-3 py-2 text-sm outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setPickerTarget(index)} className="halvaa-btn-secondary cursor-pointer px-3 py-2 text-xs">{t("pickLocation")}</button>
+                <button type="button" onClick={() => removeLocation(index)} className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary">{t("familyTreeRemove")}</button>
+              </div>
+              {(location.latitude || location.longitude) ? <p className="text-xs text-muted sm:col-span-3">{location.latitude ?? "-"}, {location.longitude ?? "-"}</p> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+        </>
+      ) : null}
+
+      {editStep === 2 ? (
+        <>
       {isSuperuser ? (
         <div className="rounded-2xl border border-border bg-surface p-4">
           <p className="text-sm font-medium text-foreground">{t("reviewerTitle")}</p>
@@ -704,31 +1097,82 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
           </div>
         </div>
       ) : null}
+        </>
+      ) : null}
 
+      {editStep === 1 ? (
+        <>
       <div className="rounded-2xl border border-border bg-surface p-4">
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-foreground">{t("galleryUpload")}</span>
-          <select value={uploadCategory} onChange={(event) => setUploadCategory(event.target.value)} className="mb-3 w-full rounded-xl border border-border px-3 py-2 text-sm outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]">
-            {MEDIA_CATEGORIES.map((category) => (
-              <option key={category} value={category}>{t(`categories.${category}`)}</option>
-            ))}
-          </select>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background p-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{t("headerImagesTitle")}</p>
+            <p className="text-xs text-muted">{t("headerImagesHint")}</p>
+          </div>
+          <button type="button" onClick={() => void handleTranslateMemorial()} disabled={translating || saving} className="halvaa-btn-secondary cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
+            {translating ? t("translating") : t("translateNow")}
+          </button>
+        </div>
+        <div className="memorial-header-preview mb-4">
+          <div className="memorial-header-preview-banner">
+            {selectedBanner ? <img src={selectedBanner.thumbnail_url ?? selectedBanner.original_url} alt={t("bannerBadge")} /> : <span>{t("bannerPreviewEmpty")}</span>}
+          </div>
+          <div className="memorial-header-preview-portrait">
+            {selectedPortrait ? <img src={selectedPortrait.thumbnail_url ?? selectedPortrait.original_url} alt={t("portraitBadge")} /> : <span>?</span>}
+          </div>
+          <p>{name}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(["banner", "portrait"] as const).map((role) => (
+            <label
+              key={role}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragTarget("library");
+              }}
+              onDragLeave={() => setDragTarget(null)}
+              onDrop={(event) => handleDrop(event, "GALLERY", role)}
+              className={["media-drop-zone", dragTarget === "library" ? "is-active" : ""].join(" ")}
+            >
+              <FieldLabel label={role === "banner" ? t("bannerImage") : t("portraitImage")} help={t(`help.${role}`)} />
+              <span>{t("choosePhoto")}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploading}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => queueUploadFiles(event.target.files, "GALLERY", role)}
+                className="sr-only"
+              />
+            </label>
+          ))}
+        </div>
+        <label
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragTarget("library");
+          }}
+          onDragLeave={() => setDragTarget(null)}
+          onDrop={(event) => handleDrop(event, "GALLERY")}
+          className={["media-drop-zone mt-3", dragTarget === "library" ? "is-active" : ""].join(" ")}
+        >
+          <FieldLabel label={t("galleryUpload")} help={t("help.gallery")} />
+          <span>{t("chooseMedia")}</span>
+          <small>{uploading ? t("uploading") : t("galleryUploadHint")}</small>
           <input
             type="file"
-            accept={uploadCategory === "DOCUMENT" || uploadCategory === "WILL" ? "image/*,application/pdf" : "image/*"}
+            accept="image/jpeg,image/png,image/webp,video/mp4"
+            multiple
             disabled={uploading}
-            onChange={(event) => void handleUpload(event.target.files?.[0] ?? null)}
-            className="block w-full cursor-pointer rounded-xl border border-border bg-background px-3 py-2 text-sm file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white disabled:cursor-wait"
+            onChange={(event: ChangeEvent<HTMLInputElement>) => queueUploadFiles(event.target.files, "GALLERY")}
+            className="sr-only"
           />
         </label>
-        <p className="mt-2 text-xs text-muted">{uploading ? t("uploading") : t("galleryUploadHint")}</p>
         {uploadMessage && <p className="mt-2 text-sm font-medium text-primary">{uploadMessage}</p>}
 
         {libraryMediaItems.length > 0 && (
           <div className="mt-4 space-y-3">
             <p className="text-sm font-medium text-foreground">{t("mediaLibraryTitle")}</p>
             {libraryMediaItems.map((item) => (
-              <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm">
+              <div key={item.id} className="grid gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
                 <div className="flex min-w-0 items-center gap-3">
                   {item.media_type === "IMAGE" && (
                     <img
@@ -737,55 +1181,92 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
                       className="h-14 w-14 rounded-lg border border-border object-cover"
                     />
                   )}
+                  {item.media_type === "VIDEO" ? (
+                    <video src={item.original_url} controls playsInline preload="metadata" className="h-14 w-20 rounded-lg border border-border object-cover" />
+                  ) : null}
                   <div className="min-w-0">
                     <p className="truncate font-medium text-foreground">{getMediaLabel(item.original_url)}</p>
                     <p className="text-xs text-muted">{t(`categories.${item.category}`)} - {item.mime_type}</p>
+                    {item.file_size_bytes ? <p className="mt-1 text-xs text-muted">{Math.round(item.file_size_bytes / 1024)} KB - {item.processing_status}</p> : null}
                     {item.title ? <p className="mt-1 text-xs font-medium text-foreground">{item.title}</p> : null}
                     {item.description ? <p className="mt-1 text-xs text-muted">{item.description}</p> : null}
                     {getMediaMeta(item).assetKind === "ARTIFACT" ? <p className="mt-1 text-xs font-medium text-primary">{t("artifactBadge")}</p> : null}
+                    {getMediaMeta(item).headerRole === "portrait" ? <p className="mt-1 text-xs font-medium text-primary">{t("portraitBadge")}</p> : null}
+                    {getMediaMeta(item).headerRole === "banner" ? <p className="mt-1 text-xs font-medium text-primary">{t("bannerBadge")}</p> : null}
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid gap-2">
+                  <input
+                    value={mediaDrafts[item.id]?.title ?? ""}
+                    onChange={(event) => setMediaDrafts((current) => ({ ...current, [item.id]: { title: event.target.value, description: current[item.id]?.description ?? "", category: current[item.id]?.category ?? item.category } }))}
+                    placeholder={t("mediaTitlePrompt")}
+                    className="rounded-xl border border-border px-3 py-2 text-xs outline-none transition focus:border-primary"
+                  />
+                  <input
+                    value={mediaDrafts[item.id]?.description ?? ""}
+                    onChange={(event) => setMediaDrafts((current) => ({ ...current, [item.id]: { title: current[item.id]?.title ?? "", description: event.target.value, category: current[item.id]?.category ?? item.category } }))}
+                    placeholder={t("mediaDescriptionPrompt")}
+                    className="rounded-xl border border-border px-3 py-2 text-xs outline-none transition focus:border-primary"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
                   <a href={item.original_url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary">
                     {t("mediaOpen")}
                   </a>
-                  <select
-                    value={item.category}
-                    onChange={(event) => void handleUpdateMediaCategory(item.id, event.target.value)}
-                    disabled={updatingMediaId === item.id}
-                    className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-foreground outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {MEDIA_CATEGORIES.map((category) => (
-                      <option key={category} value={category}>{t(`categories.${category}`)}</option>
-                    ))}
-                  </select>
                   <button type="button" onClick={() => void handleEditMediaDetails(item.id)} disabled={updatingMediaId === item.id || removingMediaId === item.id} className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
-                    {t("mediaEditDetails")}
+                    {updatingMediaId === item.id ? t("saving") : t("mediaEditDetails")}
                   </button>
                   <button type="button" onClick={() => void handleToggleArtifact(item.id)} disabled={updatingMediaId === item.id || removingMediaId === item.id} className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
                     {getMediaMeta(item).assetKind === "ARTIFACT" ? t("artifactUnset") : t("artifactSet")}
                   </button>
+                  {item.media_type === "IMAGE" ? (
+                    <>
+                      <button type="button" onClick={() => void handleSetHeaderRole(item.id, "portrait")} disabled={updatingHeaderRoleId === item.id} className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
+                        {t("setAsPortrait")}
+                      </button>
+                      <button type="button" onClick={() => void handleSetHeaderRole(item.id, "banner")} disabled={updatingHeaderRoleId === item.id} className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
+                        {t("setAsBanner")}
+                      </button>
+                    </>
+                  ) : null}
                   <button type="button" onClick={() => void handleRemoveMedia(item.id)} disabled={removingMediaId === item.id || updatingMediaId === item.id} className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
                     {removingMediaId === item.id ? t("mediaRemoving") : t("mediaRemove")}
                   </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+        </>
+      ) : null}
 
+      {editStep === 2 ? (
+        <>
       <div className="rounded-2xl border border-border bg-surface p-4">
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-foreground">{t("timelineMediaTitle")}</span>
           <p className="mb-3 text-xs text-muted">{t("timelineMediaHint")}</p>
-          <input
-            type="file"
-            accept="image/*"
-            disabled={uploading}
-            onChange={(event) => void handleUpload(event.target.files?.[0] ?? null, TIMELINE_MEDIA_CATEGORY)}
-            className="block w-full cursor-pointer rounded-xl border border-border bg-background px-3 py-2 text-sm file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white disabled:cursor-wait"
-          />
+          <label
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragTarget("timeline");
+            }}
+            onDragLeave={() => setDragTarget(null)}
+            onDrop={(event) => handleDrop(event, TIMELINE_MEDIA_CATEGORY)}
+            className={["block cursor-pointer rounded-2xl border border-dashed px-4 py-6 text-center transition", dragTarget === "timeline" ? "border-primary bg-primary/5" : "border-border bg-background"].join(" ")}
+          >
+            <span className="block text-sm font-semibold text-foreground">{t("dropFiles")}</span>
+            <span className="mt-1 block text-xs text-muted">{uploading ? t("uploading") : t("timelineMediaHint")}</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,video/mp4"
+              multiple
+              disabled={uploading}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => queueUploadFiles(event.target.files, TIMELINE_MEDIA_CATEGORY)}
+              className="sr-only"
+            />
+          </label>
         </label>
 
         {timelineMediaItems.length === 0 ? (
@@ -802,6 +1283,9 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
                       className="h-14 w-14 rounded-lg border border-border object-cover"
                     />
                   )}
+                  {item.media_type === "VIDEO" ? (
+                    <video src={item.original_url} controls playsInline preload="metadata" className="h-14 w-20 rounded-lg border border-border object-cover" />
+                  ) : null}
                   <div className="min-w-0">
                     <p className="truncate font-medium text-foreground">{getMediaLabel(item.original_url)}</p>
                     <p className="text-xs text-muted">{t("categories.TIMELINE")} - {item.mime_type}</p>
@@ -811,16 +1295,6 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
                   <a href={item.original_url} target="_blank" rel="noreferrer" className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary">
                     {t("mediaOpen")}
                   </a>
-                  <select
-                    value={item.category}
-                    onChange={(event) => void handleUpdateMediaCategory(item.id, event.target.value)}
-                    disabled={updatingMediaId === item.id}
-                    className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-foreground outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {[...MEDIA_CATEGORIES, TIMELINE_MEDIA_CATEGORY].map((category) => (
-                      <option key={category} value={category}>{t(`categories.${category}`)}</option>
-                    ))}
-                  </select>
                   <button type="button" onClick={() => void handleRemoveMedia(item.id)} disabled={removingMediaId === item.id || updatingMediaId === item.id} className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
                     {removingMediaId === item.id ? t("mediaRemoving") : t("mediaRemove")}
                   </button>
@@ -851,12 +1325,8 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
             </select>
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block font-medium text-foreground">{t("timelineDateField")}</span>
-            <input type="date" value={timelineDate} onChange={(event) => setTimelineDate(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium text-foreground">{t("timelineSortOrderField")}</span>
-            <input type="number" value={timelineSortOrder} onChange={(event) => setTimelineSortOrder(event.target.value)} className="w-full rounded-xl border border-border px-3 py-2 outline-none transition focus:border-primary focus:shadow-[var(--shadow-focus)]" />
+            <FieldLabel label={t("timelineDateField")} help={t("help.timelineDate")} />
+            <LocalizedDateInput locale={locale} value={timelineDate} onChange={setTimelineDate} labels={dateLabels} />
           </label>
         </div>
 
@@ -923,6 +1393,18 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
           </div>
         )}
       </div>
+
+      {isOwner ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="font-semibold text-red-800">{t("deleteTitle")}</p>
+          <p className="mt-1 text-sm leading-6 text-red-700">{t("deleteHint")}</p>
+          <button type="button" onClick={() => setDeleteDialogOpen(true)} className="mt-4 halvaa-btn-danger cursor-pointer">
+            {t("deleteAction")}
+          </button>
+        </div>
+      ) : null}
+        </>
+      ) : null}
 
       <div className="rounded-2xl border border-border bg-surface p-4">
         <div>
@@ -1043,10 +1525,74 @@ export function EditMemorialForm({ slug }: EditMemorialFormProps) {
             {saving ? t("saving") : t("featureNow")}
           </button>
         ) : null}
+        {isOwner ? (
+          <button type="button" onClick={() => setVisibilityDialogOpen(true)} disabled={saving} className="halvaa-btn-secondary cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
+            {memorial.status === "DEACTIVATED" ? t("reactivateMemorial") : t("deactivateMemorial")}
+          </button>
+        ) : null}
         <Link href={`/memorial/${memorial.slug}`} className="halvaa-btn-secondary inline-flex cursor-pointer">
           {tCommon("cancel")}
         </Link>
       </div>
+      <MapboxLocationPicker
+        open={pickerTarget !== null}
+        locale={locale}
+        value={selectedPickerValue}
+        onPick={handleLocationPick}
+        onClose={() => setPickerTarget(null)}
+      />
     </form>
+    <MediaPreviewDialog
+      open={previewFiles.length > 0}
+      files={previewFiles}
+      title={t("previewUploadTitle")}
+      hint={t("previewUploadHint")}
+      confirmLabel={uploading ? t("uploading") : t("useSelectedMedia")}
+      cancelLabel={tCommon("cancel")}
+      removeLabel={t("mediaRemove")}
+      onConfirm={() => void handleUploadFiles()}
+      onClose={closeUploadPreview}
+      onRemove={removePreviewFile}
+    />
+    {previewFiles.length > 0 && Object.keys(uploadProgress).length > 0 ? (
+      <div className="fixed inset-x-4 bottom-4 z-[110] mx-auto max-w-xl rounded-lg border border-border bg-background p-3 shadow-soft">
+        {previewFiles.map((item) => (
+          <div key={item.id} className="mb-2 last:mb-0">
+            <div className="flex justify-between gap-3 text-xs text-muted">
+              <span className="truncate">{item.file.name}</span>
+              <span>{uploadProgress[item.id] ?? 0}%</span>
+            </div>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-border">
+              <div className="h-full bg-primary transition-all" style={{ width: `${uploadProgress[item.id] ?? 0}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : null}
+    <ConfirmDialog
+      open={visibilityDialogOpen}
+      title={memorial.status === "DEACTIVATED" ? t("reactivateMemorial") : t("deactivateMemorial")}
+      description={memorial.status === "DEACTIVATED" ? t("reactivateConfirmSecond") : t("deactivateConfirmSecond")}
+      confirmLabel={memorial.status === "DEACTIVATED" ? t("reactivateMemorial") : t("deactivateMemorial")}
+      cancelLabel={tCommon("cancel")}
+      busyLabel={t("saving")}
+      busy={saving}
+      tone={memorial.status === "DEACTIVATED" ? "primary" : "danger"}
+      onConfirm={() => void handleVisibilityToggle()}
+      onClose={() => setVisibilityDialogOpen(false)}
+    />
+    <ConfirmDialog
+      open={deleteDialogOpen}
+      title={t("deleteTitle")}
+      description={t("deleteConfirm")}
+      confirmLabel={t("deleteAction")}
+      cancelLabel={tCommon("cancel")}
+      busyLabel={t("deleting")}
+      busy={deletingMemorial}
+      tone="danger"
+      onConfirm={() => void handleDeleteMemorial()}
+      onClose={() => setDeleteDialogOpen(false)}
+    />
+    </>
   );
 }

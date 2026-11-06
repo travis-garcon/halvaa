@@ -12,7 +12,7 @@
 export const LOCAL_MAP_STYLE_URL = "/api/map-style";
 export const TEMP_MAPBOX_TOKEN = "pk.eyJ1IjoiYWxpcHViIiwiYSI6ImNrdnpham9odjEwYXYydmxjbjE0bjc3bXQifQ.AwvrtljsjswkpklapUsDTw";
 export const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || TEMP_MAPBOX_TOKEN;
-export const DEFAULT_MAP_STYLE_URL = `https://api.mapbox.com/styles/v1/mapbox/light-v11?access_token=${MAPBOX_ACCESS_TOKEN}`;
+export const DEFAULT_MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 
 export type LocalMapConfig = {
   enabled: boolean;
@@ -35,20 +35,17 @@ export function getMapStyleUrl(): string | null {
     return null;
   }
 
-  const configured = process.env.NEXT_PUBLIC_MAP_STYLE_URL;
-  if (configured === "") {
-    return null;
-  }
+  const configured = process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim();
   if (configured) {
-    return configured.trim();
+    return configured;
   }
   return DEFAULT_MAP_STYLE_URL;
 }
 
 export function getFallbackMapStyleUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_MAP_STYLE_URL;
-  if (configured && configured.trim() !== "") {
-    return configured.trim();
+  const configured = process.env.NEXT_PUBLIC_MAP_STYLE_URL?.trim();
+  if (configured) {
+    return configured;
   }
   return DEFAULT_MAP_STYLE_URL;
 }

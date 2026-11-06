@@ -20,6 +20,22 @@ services:
     volumes:
       - halvaa_redis:/data
 
+  smtp:
+    image: boky/postfix:latest
+    restart: unless-stopped
+    environment:
+      HOSTNAME: ${SMTP_HELO_DOMAIN:-halvaa.app}
+      ALLOWED_SENDER_DOMAINS: ${SMTP_ALLOWED_SENDER_DOMAINS:-halvaa.app}
+      POSTFIX_myhostname: ${SMTP_HELO_DOMAIN:-halvaa.app}
+      POSTFIX_mynetworks: 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+      POSTFIX_alias_maps: lmdb:/etc/postfix/aliases
+      POSTFIX_alias_database: lmdb:/etc/postfix/aliases
+      POSTFIX_smtpd_client_connection_rate_limit: ${SMTP_CONNECTION_RATE_LIMIT:-20}
+      POSTFIX_smtpd_client_message_rate_limit: ${SMTP_MESSAGE_RATE_LIMIT:-60}
+      POSTFIX_smtpd_recipient_limit: ${SMTP_RECIPIENT_LIMIT:-10}
+    expose:
+      - "587"
+
   zitadel-db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -97,8 +113,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      smtp:
+        condition: service_started
       zitadel:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
@@ -112,8 +130,10 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile.runtime
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+        NEXT_INTERNAL_API_URL: ${NEXT_INTERNAL_API_URL:-http://backend:8000/api/v1}
         NEXT_PUBLIC_DEMO_FALLBACK: ${NEXT_PUBLIC_DEMO_FALLBACK:-false}
         NEXT_PUBLIC_MAP_STYLE_URL: ${NEXT_PUBLIC_MAP_STYLE_URL:-}
         NEXT_PUBLIC_LOCAL_MAP_ENABLED: ${NEXT_PUBLIC_LOCAL_MAP_ENABLED:-false}
@@ -123,11 +143,15 @@ services:
         NEXT_PUBLIC_LOCAL_MAP_TERRAIN_PM_TILES_URL: ${NEXT_PUBLIC_LOCAL_MAP_TERRAIN_PM_TILES_URL:-}
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+      NEXT_INTERNAL_API_URL: ${NEXT_INTERNAL_API_URL:-http://backend:8000/api/v1}
       NEXT_PUBLIC_DEMO_FALLBACK: ${NEXT_PUBLIC_DEMO_FALLBACK:-false}
       NEXT_PUBLIC_LOCAL_MAP_ENABLED: ${NEXT_PUBLIC_LOCAL_MAP_ENABLED:-false}
       NEXT_PUBLIC_MAP_STYLE_URL: ${NEXT_PUBLIC_MAP_STYLE_URL:-}
       NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN:-pk.eyJ1IjoiYWxpcHViIiwiYSI6ImNrdnpham9odjEwYXYydmxjbjE0bjc3bXQifQ.AwvrtljsjswkpklapUsDTw}
+      NEXT_PUBLIC_LOCAL_MAP_PM_TILES_URL: ${NEXT_PUBLIC_LOCAL_MAP_PM_TILES_URL:-}
+      NEXT_PUBLIC_LOCAL_MAP_ASSETS_URL: ${NEXT_PUBLIC_LOCAL_MAP_ASSETS_URL:-}
+      NEXT_PUBLIC_LOCAL_MAP_TERRAIN_PM_TILES_URL: ${NEXT_PUBLIC_LOCAL_MAP_TERRAIN_PM_TILES_URL:-}
     restart: unless-stopped
     depends_on:
       backend:

@@ -27,4 +27,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             else:
                 response.headers["Cache-Control"] = "no-cache"
+        elif request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["CDN-Cache-Control"] = "no-store"
+            response.headers["Surrogate-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
         return response

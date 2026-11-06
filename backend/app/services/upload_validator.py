@@ -7,7 +7,7 @@ from app.core.config import get_settings
 from app.models.enums import MediaType
 
 ALLOWED_EXTENSIONS: dict[MediaType, set[str]] = {
-    MediaType.IMAGE: {".jpg", ".jpeg", ".webp"},
+    MediaType.IMAGE: {".jpg", ".jpeg", ".png", ".webp"},
     MediaType.VIDEO: {".mp4"},
     MediaType.DOCUMENT: {".pdf"},
 }
@@ -22,6 +22,7 @@ _MEDIA_TYPE_PRIORITY: tuple[MediaType, ...] = (
 MAGIC_SIGNATURES: dict[MediaType, list[bytes]] = {
     MediaType.IMAGE: [
         b"\xff\xd8\xff",
+        b"\x89PNG\r\n\x1a\n",
         b"RIFF",
     ],
     MediaType.VIDEO: [
@@ -35,6 +36,7 @@ MAGIC_SIGNATURES: dict[MediaType, list[bytes]] = {
 MIME_BY_EXTENSION: dict[str, str] = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
+    ".png": "image/png",
     ".webp": "image/webp",
     ".mp4": "video/mp4",
     ".pdf": "application/pdf",
@@ -70,6 +72,8 @@ def _max_bytes_for(media_type: MediaType) -> int:
 def _validate_magic_bytes(content: bytes, media_type: MediaType) -> None:
     if media_type == MediaType.IMAGE:
         if content.startswith(b"\xff\xd8\xff"):
+            return
+        if content.startswith(b"\x89PNG\r\n\x1a\n"):
             return
         if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
             return

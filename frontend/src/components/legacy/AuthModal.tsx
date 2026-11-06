@@ -1,10 +1,12 @@
 "use client";
 
-import { ClipboardEvent, FormEvent, KeyboardEvent, useRef, useState } from "react";
+import { ChangeEvent, ClipboardEvent, FormEvent, KeyboardEvent, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { mutate as globalMutate } from "swr";
 
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api-client";
+import { MediaPreviewDialog, preparePreviewFiles, type PreviewFile } from "@/components/ui/MediaPreviewDialog";
 
 type AuthModalProps = {
   open: boolean;
@@ -15,10 +17,15 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
   const t = useTranslations("auth");
   const locale = useLocale();
   const { startOtp, verifyOtp, googleLogin } = useAuth();
-  const googleEnabled = Boolean(process.env.NEXT_PUBLIC_GOOGLE_AUTH_URL);
-  const [step, setStep] = useState<"start" | "verify">("start");
+  const googleEnabled = true;
+  const [step, setStep] = useState<"start" | "verify" | "complete">("start");
   const [otpId, setOtpId] = useState<string | null>(null);
+  const [isNewUser, setIsNewUser] = useState(false);
   const [identifier, setIdentifier] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [avatarFile, setAvatarFile] = useState<PreviewFile | null>(null);
+  const [avatarPreviewFiles, setAvatarPreviewFiles] = useState<PreviewFile[]>([]);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
   const [code, setCode] = useState<string[]>(["", "", "", ""]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +37,16 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
   const resetForm = () => {
     setStep("start");
     setOtpId(null);
+    setIsNewUser(false);
     setIdentifier("");
+    setFullName("");
+    if (avatarFile?.previewUrl) URL.revokeObjectURL(avatarFile.previewUrl);
+    avatarPreviewFiles.forEach((item) => {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    });
+    setAvatarFile(null);
+    setAvatarPreviewFiles([]);
+    setAvatarUploadProgress(0);
     setCode(["", "", "", ""]);
     setError(null);
     setNotice(null);
@@ -52,11 +68,16 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
         locale,
       });
       setOtpId(response.otp_id);
+      setIsNewUser(response.is_new_user);
       setStep("verify");
-      setNotice(t("otp_sent"));
+      setNotice(response.debug_code ? `${t("otp_sent")} ${t("otp_debug_code", { code: response.debug_code })}` : t("otp_sent"));
       window.setTimeout(() => codeInputs.current[0]?.focus(), 80);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("error_generic"));
+      if (err instanceof ApiError && (err.status === 403 || err.status === 503)) {
+        setError(t("otp_delivery_error"));
+      } else {
+        setError(err instanceof ApiError ? err.message : t("error_generic"));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -74,10 +95,40 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     setError(null);
     try {
       await verifyOtp(otpId, otpCode);
-      close();
+      if (isNewUser) {
+        setStep("complete");
+      } else {
+        close();
+      }
     } catch (err) {
       const message = err instanceof ApiError && err.status === 401 ? t("error_invalid") : err instanceof ApiError ? err.message : t("error_generic");
       setError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCompleteProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!fullName.trim()) {
+      setError(t("profile_name_required"));
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { api } = await import("@/lib/api-client");
+      let updatedUser = await api.updateMe({
+        full_name: fullName.trim(),
+        locale,
+      });
+      if (avatarFile) {
+        updatedUser = await api.uploadMyAvatar(avatarFile.file, setAvatarUploadProgress);
+      }
+      await globalMutate(["auth", "me"], updatedUser, { revalidate: false });
+      close();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("error_generic"));
     } finally {
       setSubmitting(false);
     }
@@ -113,6 +164,32 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     codeInputs.current[Math.min(pasted.length, 4) - 1]?.focus();
   };
 
+  const queueAvatar = (files: FileList | null) => {
+    if (!files?.length) return;
+    setAvatarPreviewFiles(
+      preparePreviewFiles(
+        [files[0]],
+        t("avatar_invalid_type"),
+        (size) => t("avatar_too_large", { size }),
+      ),
+    );
+  };
+
+  const closeAvatarPreview = () => {
+    avatarPreviewFiles.forEach((item) => {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    });
+    setAvatarPreviewFiles([]);
+  };
+
+  const confirmAvatar = () => {
+    const selected = avatarPreviewFiles[0];
+    if (!selected) return;
+    if (avatarFile?.previewUrl) URL.revokeObjectURL(avatarFile.previewUrl);
+    setAvatarFile(selected);
+    setAvatarPreviewFiles([]);
+  };
+
   return (
     <div className="modal active modal-entrance" id="authModal">
       <div
@@ -123,10 +200,10 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
         }}
         role="button"
         tabIndex={0}
-        aria-label="Close modal"
+        aria-label={t("close")}
       />
       <div className="modal-content auth-modal">
-        <button type="button" className="modal-close" onClick={close} aria-label="Close">
+        <button type="button" className="modal-close" onClick={close} aria-label={t("close")}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -173,13 +250,12 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
               <span>{submitting ? t("otp_sending") : t("otp_send")}</span>
             </button>
           </form>
-        ) : (
+        ) : step === "verify" ? (
           <form className="auth-form active" onSubmit={handleVerify}>
             {notice && <p className="auth-notice text-sm text-muted" role="status">{notice}</p>}
             <div className="otp-code-row" dir="ltr" aria-label={t("otp_code")}>
               {code.map((digit, index) => (
                 <input
-                  // eslint-disable-next-line react/no-array-index-key
                   key={index}
                   ref={(input) => {
                     codeInputs.current[index] = input;
@@ -205,8 +281,56 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
               <span>{submitting ? t("otp_verifying") : t("otp_verify")}</span>
             </button>
           </form>
+        ) : (
+          <form className="auth-form active" onSubmit={handleCompleteProfile}>
+            <p className="mb-4 text-sm leading-6 text-muted">{t("own_info_hint")}</p>
+            <div className="form-group">
+              <label htmlFor="profile-full-name" className="mb-1 block text-sm font-semibold text-foreground">{t("your_full_name")}</label>
+              <input
+                id="profile-full-name"
+                type="text"
+                className="form-input"
+                placeholder={t("your_full_name_example")}
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                autoComplete="name"
+                required
+                disabled={submitting}
+                dir="auto"
+              />
+            </div>
+            <div className="form-group">
+              <label className="mb-1 block text-sm font-semibold text-foreground">{t("your_photo")}</label>
+              <label className="media-drop-zone">
+                {avatarFile?.previewUrl ? <img src={avatarFile.previewUrl} alt={t("your_photo")} className="mx-auto h-24 w-24 rounded-full object-cover" /> : null}
+                <span>{t("choose_your_photo")}</span>
+                <input type="file" accept="image/jpeg,image/webp" disabled={submitting} className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => queueAvatar(event.target.files)} />
+              </label>
+              {avatarUploadProgress > 0 ? (
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-border">
+                  <div className="h-full bg-primary transition-all" style={{ width: `${avatarUploadProgress}%` }} />
+                </div>
+              ) : null}
+            </div>
+            {error && <p className="auth-error feedback-error text-sm">{error}</p>}
+            <button type="submit" className={"btn-primary btn-full" + (submitting ? " btn-loading" : "")} disabled={submitting}>
+              <span>{submitting ? t("profile_saving") : t("profile_save")}</span>
+            </button>
+          </form>
         )}
       </div>
+      <MediaPreviewDialog
+        open={avatarPreviewFiles.length > 0}
+        files={avatarPreviewFiles}
+        title={t("avatar_preview_title")}
+        hint={t("avatar_preview_hint")}
+        confirmLabel={t("avatar_use")}
+        cancelLabel={t("cancel")}
+        removeLabel={t("remove")}
+        onConfirm={confirmAvatar}
+        onClose={closeAvatarPreview}
+        onRemove={closeAvatarPreview}
+      />
     </div>
   );
 }

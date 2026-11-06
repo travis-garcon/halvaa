@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -29,17 +30,19 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
   if (name === "home") return <svg {...common}><path d="M4 11.5 12 5l8 6.5" /><path d="M6.5 10.5V20h11v-9.5" /><path d="M10 20v-5h4v5" /></svg>;
   if (name === "explore") return <svg {...common}><circle cx="12" cy="12" r="8" /><path d="m14.8 9.2-1.6 4-4 1.6 1.6-4Z" /></svg>;
   if (name === "create") return <svg {...common}><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
-  if (name === "store") return <svg {...common}><path d="M6 8h12l-1 12H7Z" /><path d="M9 8a3 3 0 0 1 6 0" /></svg>;
+  if (name === "store") return <svg {...common}><path d="M4 10h16l-1.5-4h-13Z" /><path d="M5 10v9h14v-9" /><path d="M5 13a3 3 0 0 0 4.5 0 3 3 0 0 0 5 0 3 3 0 0 0 4.5 0" /><path d="M10 19v-4h4v4" /></svg>;
   return <svg {...common}><circle cx="12" cy="8" r="3.5" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg>;
 }
 
 export function Header({ onSignIn }: HeaderProps) {
   const t = useTranslations("nav");
   const tAuth = useTranslations("auth");
+  const tCommon = useTranslations("common");
   const { user, isAuthenticated, logout } = useAuth();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
+  const isMemorialPage = pathname.includes("/memorial/");
 
   const navItems: NavItem[] = [
     { href: "/", label: t("home"), icon: "home" },
@@ -53,9 +56,12 @@ export function Header({ onSignIn }: HeaderProps) {
     const header = headerRef.current;
     if (!header) return;
     const onScroll = () => {
+      const scrolled = window.scrollY > 12;
       gsap.to(header, {
-        boxShadow: window.scrollY > 12 ? "0 10px 30px rgba(17,17,17,0.08)" : "0 0 0 rgba(17,17,17,0)",
-        backgroundColor: window.scrollY > 12 ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.78)",
+        boxShadow: scrolled ? "0 10px 30px rgba(17,17,17,0.08)" : "0 0 0 rgba(17,17,17,0)",
+        backgroundColor: scrolled ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0)",
+        borderColor: scrolled ? "rgba(229,231,235,0.72)" : "rgba(229,231,235,0)",
+        backdropFilter: scrolled ? "blur(18px)" : "blur(0px)",
         duration: 0.22,
         ease: "power2.out",
       });
@@ -67,11 +73,10 @@ export function Header({ onSignIn }: HeaderProps) {
 
   return (
     <>
-      <header ref={headerRef} className="sticky top-0 z-50 border-b border-border/70 backdrop-blur-xl">
+      <header ref={headerRef} className={["fixed inset-x-0 top-0 z-50 border-b border-transparent bg-transparent", isMemorialPage ? "mobile-hide-on-memorial" : ""].join(" ")}>
         <div className="halvaa-container flex h-14 items-center justify-between gap-3 md:h-16">
           <Link href="/" className="flex min-w-0 items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-sm font-black text-white md:h-9 md:w-9">H</span>
-            <span className="truncate text-base font-black tracking-tight text-foreground md:text-lg">Halvaa</span>
+            <Image src="/assets/img/logo.png" alt="Halvaa" width={114} height={60} priority className="h-9 w-auto object-contain md:h-10" />
           </Link>
 
           <nav className="hidden items-center gap-1 text-sm font-bold md:flex" aria-label={t("aria_label")}>
@@ -92,7 +97,7 @@ export function Header({ onSignIn }: HeaderProps) {
             ) : (
               onSignIn && <button type="button" className="halvaa-btn-primary hidden px-4 py-2 text-sm sm:inline-flex" onClick={onSignIn}>{tAuth("sign_in")}</button>
             )}
-            <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-white text-foreground md:hidden" onClick={() => setDrawerOpen(true)} aria-label="Menu">
+            <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-transparent text-foreground transition hover:bg-white/60 md:hidden" onClick={() => setDrawerOpen(true)} aria-label={tCommon("menu")}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
             </button>
           </div>
@@ -115,11 +120,11 @@ export function Header({ onSignIn }: HeaderProps) {
 
       {drawerOpen && (
         <div className="fixed inset-0 z-[70] md:hidden">
-          <button type="button" className="absolute inset-0 bg-black/24 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} aria-label="Close" />
+          <button type="button" className="absolute inset-0 bg-black/24 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} aria-label={tCommon("close")} />
           <aside className="absolute bottom-0 top-0 w-[82vw] max-w-xs bg-white p-5 shadow-[0_24px_80px_rgba(17,17,17,0.24)] ltr:right-0 rtl:left-0">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-lg font-black">Halvaa</span>
-              <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full border border-border" onClick={() => setDrawerOpen(false)} aria-label="Close">×</button>
+              <Image src="/assets/img/logo.png" alt="Halvaa" width={114} height={60} className="h-10 w-auto object-contain" />
+              <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full border border-border" onClick={() => setDrawerOpen(false)} aria-label={tCommon("close")}>×</button>
             </div>
             <div className="mt-5"><LocaleSwitcher /></div>
             <div className="mt-6 space-y-2">

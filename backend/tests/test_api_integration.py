@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -29,6 +30,10 @@ class TestExploreAndMemorials:
             params={"latitude": 42.3601, "longitude": -71.0589, "radius_m": 10000, "locale": "en"},
         )
         assert response.status_code == 200
+        assert response.headers["Cache-Control"] == "no-store, max-age=0"
+        assert response.headers["CDN-Cache-Control"] == "no-store"
+        assert response.headers["Surrogate-Control"] == "no-store"
+        assert response.headers["Pragma"] == "no-cache"
         payload = response.json()
         assert payload["type"] == "FeatureCollection"
         assert len(payload["features"]) >= 1
@@ -39,6 +44,21 @@ class TestExploreAndMemorials:
         assert "distance_m" in feature["properties"]
         assert "burial_site_name" in feature["properties"]
         assert "burial_plot_name" in feature["properties"]
+        assert "is_verified" in feature["properties"]
+        assert "view_count" in feature["properties"]
+
+    def test_public_view_counter_is_persisted(
+        self, client: TestClient, db_session: Session, test_memorial
+    ) -> None:
+        before = test_memorial.view_count
+        response = client.post(f"/api/v1/memorials/{test_memorial.id}/view")
+        assert response.status_code == 204
+        db_session.refresh(test_memorial)
+        assert test_memorial.view_count == before + 1
+
+        profile = client.get(f"/api/v1/memorials/slug/{test_memorial.slug}")
+        assert profile.status_code == 200
+        assert profile.json()["view_count"] == before + 1
 
     def test_memorial_by_slug_returns_profile(self, client: TestClient, test_memorial) -> None:
         response = client.get(f"/api/v1/memorials/slug/{test_memorial.slug}")
@@ -59,6 +79,7 @@ class TestExploreAndMemorials:
         from app.models.memorial import Memorial
 
         memorial = Memorial(
+            public_id="hidden-draft-test",
             slug="hidden-draft-test",
             status=MemorialStatus.DRAFT,
             created_by_id=test_user.id,
@@ -75,6 +96,7 @@ class TestExploreAndMemorials:
 
         now = datetime.now(timezone.utc)
         featured = Memorial(
+            public_id="discover-featured",
             slug="discover-featured",
             status=MemorialStatus.FEATURED,
             created_by_id=test_user.id,
@@ -83,6 +105,7 @@ class TestExploreAndMemorials:
             featured_at=now,
         )
         published = Memorial(
+            public_id="discover-published",
             slug="discover-published",
             status=MemorialStatus.PUBLISHED,
             created_by_id=test_user.id,
@@ -105,6 +128,7 @@ class TestExploreAndMemorials:
 
         now = datetime.now(timezone.utc)
         older = Memorial(
+            public_id="discover-latest-older",
             slug="discover-latest-older",
             status=MemorialStatus.PUBLISHED,
             created_by_id=test_user.id,
@@ -112,6 +136,7 @@ class TestExploreAndMemorials:
             published_at=now - timedelta(days=4),
         )
         newer = Memorial(
+            public_id="discover-latest-newer",
             slug="discover-latest-newer",
             status=MemorialStatus.PUBLISHED,
             created_by_id=test_user.id,
@@ -134,6 +159,7 @@ class TestExploreAndMemorials:
         from app.models.memorial import Memorial
 
         memorial = Memorial(
+            public_id="discover-burial-site",
             slug="discover-burial-site",
             status=MemorialStatus.PUBLISHED,
             created_by_id=test_user.id,
@@ -218,6 +244,7 @@ class TestGuestbook:
             headers=headers,
             json={
                 "slug": "queue-owner-memorial",
+                "status": "DRAFT",
                 "translations": {"en": {"name": "Queue Owner Memorial"}},
             },
         )
@@ -280,6 +307,18 @@ class TestAuth:
         me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert me.status_code == 200
         assert me.json()["email"] == "integration-test@example.com"
+        assert me.json()["profile_completion_percent"] == 60
+        assert set(me.json()["missing_profile_fields"]) == {"phone_number", "address"}
+
+        completed = client.patch(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"phone_number": "+15555550123", "address": "21 Memory Lane"},
+        )
+        assert completed.status_code == 200
+        assert completed.json()["address"] == "21 Memory Lane"
+        assert completed.json()["profile_completed"] is True
+        assert completed.json()["profile_completion_percent"] == 100
 
     def test_login_with_form(self, client: TestClient) -> None:
         client.post(
@@ -319,6 +358,7 @@ class TestMemorialManagement:
             headers=headers,
             json={
                 "slug": "owner-flow-memorial",
+                "status": "DRAFT",
                 "birth_date": "1930-01-01",
                 "death_date": "2001-02-03",
                 "burial_address": "Evergreen Cemetery",
@@ -374,6 +414,7 @@ class TestMemorialManagement:
             headers=headers,
             json={
                 "slug": "publish-flow-memorial",
+                "status": "DRAFT",
                 "translations": {"en": {"name": "Publish Flow Memorial"}},
             },
         )
@@ -428,7 +469,7 @@ class TestMemorialManagement:
         assert featured_after_publish.json()["status"] == "FEATURED"
         assert featured_after_publish.json()["featured_at"] is not None
 
-    def test_owner_cannot_publish_without_review_capability(self, client: TestClient) -> None:
+    def test_owner_can_publish_draft_without_review_capability(self, client: TestClient) -> None:
         register = client.post(
             "/api/v1/auth/register",
             json={
@@ -444,24 +485,22 @@ class TestMemorialManagement:
         create = client.post(
             "/api/v1/memorials",
             headers=headers,
-            json={"slug": "owner-no-review", "translations": {"en": {"name": "Owner No Review"}}},
+            json={
+                "slug": "owner-no-review",
+                "status": "DRAFT",
+                "translations": {"en": {"name": "Owner No Review"}},
+            },
         )
         assert create.status_code == 201
         memorial_id = create.json()["id"]
-
-        pending = client.post(
-            f"/api/v1/memorials/{memorial_id}/status",
-            headers=headers,
-            json={"status": "PENDING_APPROVAL"},
-        )
-        assert pending.status_code == 200
 
         published = client.post(
             f"/api/v1/memorials/{memorial_id}/status",
             headers=headers,
             json={"status": "PUBLISHED"},
         )
-        assert published.status_code == 403
+        assert published.status_code == 200
+        assert published.json()["status"] == "PUBLISHED"
 
     def test_review_history_includes_memorial_and_guestbook_activity(self, client: TestClient, db_session: Session) -> None:
         from app.core.auth import create_access_token, hash_password
@@ -495,6 +534,7 @@ class TestMemorialManagement:
             headers=headers,
             json={
                 "slug": "history-owner-memorial",
+                "status": "DRAFT",
                 "translations": {"en": {"name": "History Owner Memorial"}},
             },
         )
@@ -645,7 +685,9 @@ class TestMemorialManagement:
         profile_after_delete = client.get(f"/api/v1/memorials/slug/timeline-owner-memorial", headers=headers)
         assert profile_after_delete.status_code == 200
 
-    def test_owner_can_update_media_metadata(self, client: TestClient, db_session: Session) -> None:
+    def test_owner_can_update_media_metadata(
+        self, client: TestClient, db_session: Session, tmp_path: Path
+    ) -> None:
         from app.models.enums import MediaCategory, MediaProcessingStatus, MediaType
         from app.models.media import MediaAsset
         from app.models.timeline import TimelineEvent
@@ -673,11 +715,14 @@ class TestMemorialManagement:
         assert create.status_code == 201
         memorial_id = create.json()["id"]
 
+        artifact_path = tmp_path / "test-artifact.jpg"
+        artifact_path.write_bytes(b"test artifact")
+
         asset = MediaAsset(
             memorial_id=memorial_id,
             media_type=MediaType.IMAGE,
             category=MediaCategory.GALLERY,
-            original_storage_key="uploads/test-artifact.jpg",
+            original_storage_key=str(artifact_path),
             thumbnail_storage_key=None,
             mime_type="image/jpeg",
             file_size_bytes=1024,
@@ -744,6 +789,7 @@ class TestMemorialManagement:
             headers=headers,
             json={
                 "slug": "family-owner-memorial",
+                "status": "DRAFT",
                 "translations": {"en": {"name": "Family Owner Memorial"}},
                 "family_tree": [
                     {"name": "Mary Owner", "relation": "Spouse", "years": "1940 - 2018"},

@@ -1,3 +1,4 @@
+import mimetypes
 from pathlib import Path
 from typing import Any, cast
 
@@ -18,6 +19,11 @@ from lib.config import zitadel_config
 from lib.guard import RedirectError, redirect_exception_handler
 
 settings = get_settings()
+
+# python:slim does not ship a WebP MIME entry, so StaticFiles would otherwise
+# serve generated thumbnails as application/octet-stream. Browsers can reject
+# that response when X-Content-Type-Options is set to nosniff.
+mimetypes.add_type("image/webp", ".webp")
 
 app = FastAPI(
     title="Halvaa API",

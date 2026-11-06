@@ -1,5 +1,6 @@
 import { geoJsonToGridMemorials, getSampleGridMemorials } from "@/lib/explore-data";
 import { isDemoFallbackEnabled } from "@/lib/demo-mode";
+import { isMemorialLocallyDeleted } from "@/lib/explore-cache";
 import type {
   ExploreMemorialFeed,
   GeoJSONFeatureCollection,
@@ -98,7 +99,7 @@ export function resolveGridMemorials(
   collection: GeoJSONFeatureCollection | undefined,
   locale: string,
 ): GridMemorial[] {
-  const fromApi = collection ? geoJsonToGridMemorials(collection) : [];
+  const fromApi = collection ? geoJsonToGridMemorials(collection).filter((item) => !isMemorialLocallyDeleted(item.id)) : [];
   if (fromApi.length) {
     return fromApi;
   }
@@ -110,7 +111,7 @@ export function resolveDiscoveryMemorials(
   locale: string,
 ): GridMemorial[] {
   if (feed?.items.length) {
-    return feed.items.map((item) => ({
+    return feed.items.filter((item) => !isMemorialLocallyDeleted(item.id)).map((item) => ({
       id: item.id,
       slug: item.slug,
       name: item.name,
@@ -118,12 +119,18 @@ export function resolveDiscoveryMemorials(
         burialAddress: item.burial_address,
         burialSiteName: item.burial_site_name,
         burialPlotName: item.burial_plot_name,
+        category: item.category,
+        metadata: item.metadata,
+        filterTags: item.filter_tags,
         latitude: item.latitude,
       longitude: item.longitude,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
       publishedAt: item.published_at,
       featuredAt: item.featured_at,
+      isVerified: item.is_verified,
+      viewCount: item.view_count,
+      imageUrl: item.image_url ?? undefined,
     }));
   }
 

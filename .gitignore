@@ -13,3 +13,8 @@ build/
 *.log
 data/tiles/*.mbtiles
 data/tiles/*.pmtiles
+
+.env*
+!.env.example
+!*.example
+

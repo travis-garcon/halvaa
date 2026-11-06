@@ -1,16 +1,15 @@
 "use client";
 
-import "maplibre-gl/dist/maplibre-gl.css";
-import { layers, namedFlavor } from "@protomaps/basemaps";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { DEFAULT_COORDINATES } from "@/hooks/use-geolocation";
 import { isDemoFallbackEnabled } from "@/lib/demo-mode";
 import { getSampleGridMemorials } from "@/lib/explore-data";
-import { MAPBOX_ACCESS_TOKEN, getFallbackMapStyleUrl, getLocalMapConfig, getMapStyleUrl, type LocalMapConfig } from "@/lib/map-config";
+import { MAPBOX_ACCESS_TOKEN, getMapStyleUrl } from "@/lib/map-config";
 import type { GeoJSONFeatureCollection } from "@/types/memorial";
-import type { GeoJSONSource, LayerSpecification, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
+import type { GeoJSONSource, Map as MapboxMapInstance } from "mapbox-gl";
 
 type MapboxMapProps = {
   locale: string;
@@ -18,98 +17,13 @@ type MapboxMapProps = {
   className?: string;
 };
 
-let pmtilesProtocolRegistered = false;
 let rtlTextPluginRegistered = false;
 
-const MAP_LABEL_FONT = ["Noto Sans Regular"];
 const MAP_LABEL_FONT_MEDIUM = ["Noto Sans Medium"];
-
-function createLocalMapStyle(config: LocalMapConfig, locale: string): StyleSpecification {
-  const baseLayers = layers("protomaps", namedFlavor("light"), { lang: locale === "fa" || locale === "ar" ? locale : "en" }) as StyleSpecification["layers"];
-  const localizedBaseLayers = baseLayers.map((layer) => {
-    if (layer.type !== "symbol") {
-      return layer;
-    }
-
-    return {
-      ...layer,
-      layout: {
-        ...layer.layout,
-        "text-font": MAP_LABEL_FONT,
-      },
-    };
-  });
-  const firstSymbolLayer = localizedBaseLayers.findIndex((layer) => layer.type === "symbol");
-  const terrainLayers: LayerSpecification[] = config.terrainPmtilesUrl
-    ? [
-        {
-          id: "halvaa-hillshade",
-          type: "hillshade",
-          source: "terrain-dem",
-          minzoom: 7,
-          paint: {
-            "hillshade-exaggeration": 0.35,
-            "hillshade-shadow-color": "#56463a",
-            "hillshade-highlight-color": "#fff7ef",
-            "hillshade-accent-color": "#d9c3aa",
-          },
-        },
-      ]
-    : [];
-  const buildingExtrusionLayer: LayerSpecification = {
-    id: "halvaa-3d-buildings",
-    type: "fill-extrusion",
-    source: "protomaps",
-    "source-layer": "buildings",
-    minzoom: 11,
-    filter: ["in", ["get", "kind"], ["literal", ["building", "building_part"]]],
-    paint: {
-      "fill-extrusion-color": [
-        "case",
-        ["==", ["get", "kind"], "building_part"],
-        "#d8cdc0",
-        ["interpolate", ["linear"], ["coalesce", ["get", "height"], 20], 0, "#efe5da", 80, "#cdb79d"],
-      ],
-      "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 10.8, 0, 12.2, ["coalesce", ["get", "height"], 18]],
-      "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
-      "fill-extrusion-opacity": 0.84,
-      "fill-extrusion-vertical-gradient": true,
-    },
-  };
-  const styleLayers = [...terrainLayers, ...localizedBaseLayers];
-  styleLayers.splice(firstSymbolLayer >= 0 ? firstSymbolLayer : styleLayers.length, 0, buildingExtrusionLayer);
-
-  return {
-    version: 8,
-    light: {
-      anchor: "viewport",
-      color: "#FFF3E0",
-      intensity: 0.45,
-      position: [1.2, 160, 35],
-    },
-    glyphs: `${config.assetsUrl}/fonts/{fontstack}/{range}.pbf`,
-    sprite: `${config.assetsUrl}/sprites/v4/light`,
-    sources: {
-      ...(config.terrainPmtilesUrl
-        ? {
-            "terrain-dem": {
-              type: "raster-dem",
-              url: `pmtiles://${config.terrainPmtilesUrl}`,
-              tileSize: 256,
-              maxzoom: 14,
-              encoding: "terrarium",
-            } as const,
-          }
-        : {}),
-      protomaps: {
-        type: "vector",
-        url: `pmtiles://${config.pmtilesUrl}`,
-        attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>',
-      },
-    },
-    layers: styleLayers,
-  };
-}
+// Temporary local-map note:
+// The previous MapLibre + PMTiles implementation is intentionally parked while
+// Explore uses Mapbox GL. `src/app/api/map-style` and local tile routes remain
+// in the app so the offline path can be restored later.
 
 function sampleCollection(locale: string): GeoJSONFeatureCollection {
   const samples = getSampleGridMemorials(locale).slice(0, 6);
@@ -166,10 +80,9 @@ function withMapboxToken(url: string): string {
 export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps) {
   const t = useTranslations("explore");
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<MapLibreMap | null>(null);
+  const mapRef = useRef<MapboxMapInstance | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-style" | "empty">("loading");
   const [featureCount, setFeatureCount] = useState(0);
-  const [tilted, setTilted] = useState(true);
   const [locating, setLocating] = useState(false);
 
   const sourceData = useMemo(() => {
@@ -190,11 +103,7 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
     [sourceData],
   );
 
-  const localMapConfig = useMemo(() => getLocalMapConfig(), []);
-  const mapStyle = useMemo(
-    () => (localMapConfig.enabled ? createLocalMapStyle(localMapConfig, locale) : getMapStyleUrl()),
-    [localMapConfig, locale],
-  );
+  const mapStyle = useMemo(() => getMapStyleUrl(), []);
   const hasStyleUrl = !!mapStyle;
   const hasFeatures = sourceData.features.length > 0;
 
@@ -220,45 +129,27 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
     }, 20_000);
 
     (async () => {
-      let resolvedStyle = mapStyle;
-      if (localMapConfig.enabled) {
-        try {
-          const localMapHealthUrl = new URL("/health.txt", localMapConfig.pmtilesUrl).toString();
-          const healthResponse = await fetch(localMapHealthUrl, { cache: "no-store" });
-          if (!healthResponse.ok) {
-            throw new Error(`Local map unavailable (${healthResponse.status})`);
-          }
-        } catch {
-          resolvedStyle = getFallbackMapStyleUrl();
-        }
-      }
-
-      const { default: maplibregl } = await import("maplibre-gl");
-      if (localMapConfig.enabled && !pmtilesProtocolRegistered) {
-        const { Protocol } = await import("pmtiles");
-        const protocol = new Protocol();
-        maplibregl.addProtocol("pmtiles", protocol.tile);
-        pmtilesProtocolRegistered = true;
-      }
-      if ((locale === "fa" || locale === "ar") && !rtlTextPluginRegistered) {
-        maplibregl.setRTLTextPlugin("/mapbox-gl-rtl-text.js", true);
+      const { default: mapboxgl } = await import("mapbox-gl");
+      mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+      if (!rtlTextPluginRegistered) {
+        mapboxgl.setRTLTextPlugin("/mapbox-gl-rtl-text.js", () => undefined, true);
         rtlTextPluginRegistered = true;
       }
       if (cancelled) return;
 
-      const map = new maplibregl.Map({
+      const map = new mapboxgl.Map({
         container: mapContainerRef.current!,
-        style: resolvedStyle,
+        style: mapStyle,
         center: [center.longitude, center.latitude],
         zoom: 11,
         bearing: -18,
         pitch: 45,
         maxPitch: 75,
         attributionControl: false,
+        logoPosition: "bottom-left",
         transformRequest: (url) => ({ url: withMapboxToken(url) }),
       });
 
-      map.addControl(new maplibregl.NavigationControl(), locale === "fa" || locale === "ar" ? "top-left" : "top-right");
       mapRef.current = map;
 
       map.on("load", () => {
@@ -266,15 +157,18 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
 
         setFeatureCount(sourceData.features.length);
 
-        try {
-          if (localMapConfig.terrainPmtilesUrl && map.getSource("terrain-dem")) {
-            map.setTerrain({ source: "terrain-dem", exaggeration: 1.2 });
-          }
-        } catch {
-          // terrain is optional — map still works without it
-        }
-
         clearTimeout(styleTimeout);
+
+        const languageField = locale === "fa" ? "name_fa" : locale === "ar" ? "name_ar" : locale === "zh" ? "name_zh-Hans" : "name_en";
+        map.getStyle().layers?.forEach((layer) => {
+          if (layer.type === "symbol" && layer.layout && "text-field" in layer.layout) {
+            try {
+              map.setLayoutProperty(layer.id, "text-field", ["coalesce", ["get", languageField], ["get", "name_en"], ["get", "name"]]);
+            } catch {
+              // Some Mapbox layers reject runtime localization expressions.
+            }
+          }
+        });
 
         if (map.getSource("memorials")) {
           (map.getSource("memorials") as GeoJSONSource).setData(sourceData);
@@ -362,7 +256,7 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
                     })
                     .join("");
                   if (memorials) {
-                    new maplibregl.Popup({ offset: 18, closeButton: true })
+                    new mapboxgl.Popup({ offset: 18, closeButton: true })
                       .setLngLat(event.lngLat)
                       .setHTML(`<div style="min-width:200px"><strong>${escapeHtml(t("clusterTitle"))}</strong><ul style="margin:8px 0 0;padding-left:18px">${memorials}</ul></div>`)
                       .addTo(map);
@@ -385,7 +279,7 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
             const plot = feature?.properties?.burial_plot_name;
             const coordinates = feature?.geometry.type === "Point" ? feature.geometry.coordinates : null;
             if (slug && coordinates) {
-              new maplibregl.Popup({ offset: 18, closeButton: true })
+              new mapboxgl.Popup({ offset: 18, closeButton: true })
                 .setLngLat(coordinates as [number, number])
                 .setHTML(
                   `<div style="min-width:160px"><strong>${escapeHtml(String(name))}</strong>${site || plot ? `<p style="margin:6px 0;color:#64748b">${escapeHtml([site, plot].filter(Boolean).join(" · "))}</p>` : ""}<p style="margin:6px 0;color:#64748b">${formatDistance(distance, locale)}</p><a href="/${locale}/memorial/${escapeHtml(String(slug))}" style="color:#0369A1;font-weight:600">${escapeHtml(t("openMemorial"))}</a></div>`,
@@ -423,15 +317,9 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [locale, dataKey, hasStyleUrl, sourceData, mapStyle, localMapConfig, t]);
+  }, [locale, dataKey, hasStyleUrl, sourceData, mapStyle, t]);
 
   const ready = status === "ready" && hasFeatures;
-
-  const toggleTilt = () => {
-    const nextTilted = !tilted;
-    setTilted(nextTilted);
-    mapRef.current?.easeTo({ pitch: nextTilted ? 45 : 0, duration: 450 });
-  };
 
   const locateUser = () => {
     if (!navigator.geolocation || !mapRef.current) {
@@ -444,7 +332,7 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
         mapRef.current?.easeTo({
           center: [position.coords.longitude, position.coords.latitude],
           zoom: 13,
-          pitch: tilted ? 45 : 0,
+          pitch: 45,
           duration: 700,
         });
       },
@@ -462,21 +350,19 @@ export function MapboxMap({ locale, collection, className = "" }: MapboxMapProps
       />
 
       {hasStyleUrl && status !== "error" && (
-        <div className="absolute top-4 flex gap-2 rounded-full border border-border bg-background/90 p-1 shadow-soft backdrop-blur ltr:left-4 rtl:right-4">
-          <button
-            type="button"
-            onClick={toggleTilt}
-            className="cursor-pointer rounded-full px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          >
-            {tilted ? t("mapFlat") : t("map3d")}
-          </button>
+        <div className="explore-map-gps-control">
           <button
             type="button"
             onClick={locateUser}
             disabled={locating}
-            className="cursor-pointer rounded-full px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-primary hover:text-white disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            aria-label={locating ? t("mapLocating") : t("mapLocate")}
+            title={locating ? t("mapLocating") : t("mapLocate")}
+            className="explore-map-gps-button"
           >
-            {locating ? t("mapLocating") : t("mapLocate")}
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z" />
+              <path d="M12 2.8v3M12 18.2v3M21.2 12h-3M5.8 12h-3" />
+            </svg>
           </button>
         </div>
       )}

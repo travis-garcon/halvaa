@@ -3,18 +3,21 @@ import string
 import uuid
 from typing import Annotated, cast
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import update
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_user_optional, get_db
+from app.core.config import get_settings
 from app.models.collaborator import MemorialCollaborator
+from app.models.contribution import MemorialContribution
 from app.models.base import utc_now
-from app.models.enums import CollaboratorRole, GuestbookStatus, MemorialStatus
+from app.models.enums import CollaboratorRole, MemorialStatus
 from app.models.guestbook import GuestbookEntry
 from app.models.media import MediaAsset
 from app.models.memorial import Memorial
 from app.models.review_event import ReviewEvent
-from app.models.store import Purchase, StoreItem
+from app.models.store import LandingMemorialPlacement, Purchase
 from app.models.timeline import TimelineEvent
 from app.models.user import User
 from app.schemas.collaborator import MemorialCollaboratorInvite, MemorialCollaboratorList, MemorialCollaboratorPublic, MemorialCollaboratorUpdate
@@ -26,9 +29,11 @@ from app.schemas.memorial import (
     MemorialReviewActivityItem,
     MemorialReviewUpdate,
     MemorialStatusUpdate,
+    MemorialTranslateRequest,
     MemorialUpdate,
 )
 from app.schemas.timeline import TimelineEventCreate, TimelineEventPublic, TimelineEventUpdate
+from app.services.media_processor import delete_memorial_storage
 from app.services.media_public import media_asset_to_public
 from app.services.memorials import apply_coordinates, memorial_to_profile_public, memorial_to_public
 from app.services.memorial_workflow import apply_status_transition, review_pending_memorial
@@ -43,10 +48,12 @@ from app.services.permissions import (
     require_memorial_capability,
     resolve_effective_role,
 )
-from app.models.enums import PurchaseStatus, StoreItemKind
+from app.services.entitlements import consume_custom_id_slot, has_custom_id_slot, has_memorial_slot
 from app.services.text_policy import assert_acceptable_text, assert_not_duplicate_text
+from app.services.translation import DEFAULT_TARGET_LOCALES, translate_memorial_layers
 
 router = APIRouter(prefix="/memorials", tags=["memorials"])
+settings = get_settings()
 
 RANDOM_ID_ALPHABET = string.ascii_lowercase + string.digits
 
@@ -57,21 +64,6 @@ def _generate_public_id(session: Session) -> str:
         if session.exec(select(Memorial).where(Memorial.public_id == value)).first() is None:
             return value
     raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not allocate memorial ID")
-
-
-def _has_custom_id_entitlement(session: Session, user: User) -> bool:
-    return (
-        session.exec(
-            select(Purchase)
-            .join(StoreItem, StoreItem.id == Purchase.store_item_id)
-            .where(
-                Purchase.user_id == user.id,
-                Purchase.status.in_([PurchaseStatus.PAID, PurchaseStatus.ASSIGNED]),
-                StoreItem.kind == StoreItemKind.CUSTOM_MEMORIAL_ID,
-            )
-        ).first()
-        is not None
-    )
 
 
 def _flatten_translation_text(translations: dict) -> list[str]:
@@ -183,6 +175,9 @@ def create_memorial(
     session: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> MemorialPublic:
+    if settings.should_enforce_memorial_slot_limit and not has_memorial_slot(session, current_user):
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Your free memorial is already used. Choose a package to create more memorials.")
+
     text_values = _flatten_translation_text(payload.translations)
     assert_acceptable_text([*text_values, payload.burial_address, payload.burial_site_name, payload.burial_plot_name])
     main_story = " ".join(text_values)
@@ -194,7 +189,7 @@ def create_memorial(
         assert_not_duplicate_text(main_story, existing_stories)
 
     requested_slug = payload.slug
-    if requested_slug and not _has_custom_id_entitlement(session, current_user):
+    if requested_slug and not has_custom_id_slot(session, current_user):
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Custom memorial IDs require a store purchase")
 
     public_id = requested_slug or _generate_public_id(session)
@@ -214,9 +209,14 @@ def create_memorial(
         translations=payload.translations,
         theme_overrides=payload.theme_overrides,
         family_tree=payload.family_tree,
+        category=payload.category,
+        meta={**payload.metadata, **({"translation_status": payload.translation_status} if payload.translation_status else {})},
+        filter_tags=payload.filter_tags,
+        locations=payload.locations,
         created_by_id=current_user.id,
-        status=MemorialStatus.PUBLISHED,
-        published_at=utc_now(),
+        status=payload.status,
+        published_at=utc_now() if payload.status in {MemorialStatus.PUBLISHED, MemorialStatus.FEATURED} else None,
+        featured_at=utc_now() if payload.status == MemorialStatus.FEATURED else None,
     )
     try:
         apply_coordinates(memorial, payload.latitude, payload.longitude)
@@ -224,6 +224,11 @@ def create_memorial(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     session.add(memorial)
     session.flush()
+    if requested_slug:
+        try:
+            consume_custom_id_slot(session, current_user)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
 
     session.add(
         MemorialCollaborator(
@@ -233,6 +238,35 @@ def create_memorial(
             accepted_at=utc_now(),
         )
     )
+    session.commit()
+    session.refresh(memorial)
+    return memorial_to_public(session, memorial)
+
+
+@router.post("/{memorial_id}/translate", response_model=MemorialPublic)
+async def translate_memorial(
+    memorial_id: uuid.UUID,
+    payload: MemorialTranslateRequest,
+    session: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> MemorialPublic:
+    memorial = require_memorial_access(
+        session,
+        memorial_id,
+        current_user,
+        minimum_role=CollaboratorRole.EDITOR,
+    )
+    require_memorial_capability(session, memorial, current_user, CAPABILITY_EDIT)
+
+    target_locales = tuple(dict.fromkeys(locale.strip() for locale in payload.target_locales if locale.strip())) or DEFAULT_TARGET_LOCALES
+    result = await translate_memorial_layers(
+        memorial,
+        source_locale=payload.source_locale,
+        target_locales=target_locales,
+    )
+    memorial.translations = result.translations
+    memorial.meta = {**(memorial.meta or {}), "translation_status": result.status}
+    session.add(memorial)
     session.commit()
     session.refresh(memorial)
     return memorial_to_public(session, memorial)
@@ -310,6 +344,26 @@ def get_memorial_by_slug(
     return cast(MemorialProfilePublic, _read_memorial(memorial, session, current_user, profile=True))
 
 
+@router.post("/{memorial_id}/view", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+def record_memorial_view(
+    memorial_id: uuid.UUID,
+    session: Annotated[Session, Depends(get_db)],
+) -> Response:
+    result = session.execute(
+        update(Memorial)
+        .where(
+            Memorial.id == memorial_id,
+            Memorial.status.in_([MemorialStatus.PUBLISHED, MemorialStatus.FEATURED]),
+        )
+        .values(view_count=Memorial.view_count + 1)
+    )
+    if result.rowcount == 0:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memorial not found")
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{memorial_id}", response_model=MemorialPublic)
 def get_memorial(
     memorial_id: uuid.UUID,
@@ -341,9 +395,15 @@ def update_memorial(
     status_value = update_data.pop("status", None)
     latitude = update_data.pop("latitude", None)
     longitude = update_data.pop("longitude", None)
+    metadata_value = update_data.pop("metadata", None)
+    translation_status = update_data.pop("translation_status", None)
 
     for field, value in update_data.items():
         setattr(memorial, field, value)
+    if metadata_value is not None:
+        memorial.meta = metadata_value
+    if translation_status is not None:
+        memorial.meta = {**(memorial.meta or {}), "translation_status": translation_status}
 
     if latitude is not None or longitude is not None:
         try:
@@ -357,11 +417,15 @@ def update_memorial(
         elif status_value == MemorialStatus.FEATURED:
             require_memorial_capability(session, memorial, current_user, CAPABILITY_FEATURE)
         elif status_value == MemorialStatus.PUBLISHED:
-            if not (
+            if memorial.status in {MemorialStatus.DRAFT, MemorialStatus.DEACTIVATED}:
+                require_memorial_capability(session, memorial, current_user, CAPABILITY_EDIT)
+            elif not (
                 has_memorial_capability(session, memorial, current_user, CAPABILITY_REVIEW)
                 or has_memorial_capability(session, memorial, current_user, CAPABILITY_FEATURE)
             ):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        elif status_value == MemorialStatus.DEACTIVATED:
+            require_memorial_capability(session, memorial, current_user, CAPABILITY_EDIT)
         else:
             require_memorial_capability(session, memorial, current_user, CAPABILITY_EDIT)
         apply_status_transition(memorial, status_value)
@@ -391,17 +455,55 @@ def update_memorial_status(
     elif payload.status == MemorialStatus.FEATURED:
         require_memorial_capability(session, memorial, current_user, CAPABILITY_FEATURE)
     elif payload.status == MemorialStatus.PUBLISHED:
-        if not (
+        if memorial.status in {MemorialStatus.DRAFT, MemorialStatus.DEACTIVATED}:
+            require_memorial_capability(session, memorial, current_user, CAPABILITY_EDIT)
+        elif not (
             has_memorial_capability(session, memorial, current_user, CAPABILITY_REVIEW)
             or has_memorial_capability(session, memorial, current_user, CAPABILITY_FEATURE)
         ):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    elif payload.status == MemorialStatus.DEACTIVATED:
+        require_memorial_capability(session, memorial, current_user, CAPABILITY_EDIT)
+    else:
+        require_memorial_capability(session, memorial, current_user, CAPABILITY_EDIT)
 
     apply_status_transition(memorial, payload.status)
     session.add(memorial)
     session.commit()
     session.refresh(memorial)
     return memorial_to_public(session, memorial)
+
+
+@router.delete("/{memorial_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_memorial(
+    memorial_id: uuid.UUID,
+    session: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    memorial = require_memorial_access(
+        session,
+        memorial_id,
+        current_user,
+        minimum_role=CollaboratorRole.OWNER,
+    )
+
+    review_events = session.exec(select(ReviewEvent).where(ReviewEvent.memorial_id == memorial_id)).all()
+    timeline_events = session.exec(select(TimelineEvent).where(TimelineEvent.memorial_id == memorial_id)).all()
+    media_assets = session.exec(select(MediaAsset).where(MediaAsset.memorial_id == memorial_id)).all()
+    guestbook_entries = session.exec(select(GuestbookEntry).where(GuestbookEntry.memorial_id == memorial_id)).all()
+    contributions = session.exec(select(MemorialContribution).where(MemorialContribution.memorial_id == memorial_id)).all()
+    placements = session.exec(select(LandingMemorialPlacement).where(LandingMemorialPlacement.memorial_id == memorial_id)).all()
+    collaborators = session.exec(select(MemorialCollaborator).where(MemorialCollaborator.memorial_id == memorial_id)).all()
+    purchases = session.exec(select(Purchase).where(Purchase.memorial_id == memorial_id)).all()
+
+    for purchase in purchases:
+        purchase.memorial_id = None
+        session.add(purchase)
+    for row in [*review_events, *timeline_events, *contributions, *placements, *collaborators, *guestbook_entries, *media_assets]:
+        session.delete(row)
+    session.delete(memorial)
+    session.commit()
+    delete_memorial_storage(memorial_id)
 
 
 @router.post("/{memorial_id}/review", response_model=MemorialPublic)

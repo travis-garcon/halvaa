@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Optional
 
 from geoalchemy2 import Geography
-from sqlalchemy import Column, Date, Enum as SAEnum, String
+from sqlalchemy import BigInteger, Column, Date, Enum as SAEnum, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -40,6 +40,16 @@ class MemorialBase(SQLModel):
     last_reviewed_at: Optional[datetime] = Field(default=None)
     last_review_decision: Optional[str] = Field(default=None, sa_column=Column(String(length=32), nullable=True))
     family_tree: list[dict[str, str]] = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
+    category: Optional[str] = Field(default=None, max_length=80, index=True)
+    meta: dict[str, Any] = Field(default_factory=dict, sa_column=Column("metadata", JSONB, nullable=False, server_default="{}"))
+    filter_tags: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
+    is_verified: bool = Field(default=False, index=True)
+    verified_at: Optional[datetime] = Field(default=None)
+    view_count: int = Field(
+        default=0,
+        sa_column=Column(BigInteger, nullable=False, server_default="0", index=True),
+    )
+    locations: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
 
 
 class Memorial(UUIDPrimaryKeyMixin, TimestampMixin, MemorialBase, table=True):

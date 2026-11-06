@@ -2,6 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 
 import { ExploreTeaser } from "@/components/ExploreTeaser";
 import { HeroSection } from "@/components/HeroSection";
+import { LandingInfoSections } from "@/components/LandingInfoSections";
 import { LandingMemorialShowcase } from "@/components/LandingMemorialShowcase";
 import { LandingScrollStory } from "@/components/LandingScrollStory";
 import { ModernPageShell } from "@/components/ModernPageShell";
@@ -20,6 +21,7 @@ export default async function HomePage({ params }: HomePageProps) {
       <HeroSection />
       <LandingScrollStory />
       <LandingMemorialShowcase />
+      <LandingInfoSections />
       <ExploreTeaser />
     </ModernPageShell>
   );

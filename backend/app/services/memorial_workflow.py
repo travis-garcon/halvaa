@@ -1,4 +1,4 @@
-"""Forward-only memorial workflow: DRAFT → PENDING_APPROVAL → PUBLISHED → FEATURED."""
+"""Memorial workflow with owner/admin visibility controls."""
 
 from datetime import datetime, timezone
 
@@ -7,10 +7,11 @@ from fastapi import HTTPException, status
 from app.models.enums import MemorialStatus
 
 ALLOWED_STATUS_TRANSITIONS: dict[MemorialStatus, frozenset[MemorialStatus]] = {
-    MemorialStatus.DRAFT: frozenset({MemorialStatus.PENDING_APPROVAL}),
-    MemorialStatus.PENDING_APPROVAL: frozenset({MemorialStatus.PUBLISHED}),
-    MemorialStatus.PUBLISHED: frozenset({MemorialStatus.FEATURED}),
-    MemorialStatus.FEATURED: frozenset(),
+    MemorialStatus.DRAFT: frozenset({MemorialStatus.PENDING_APPROVAL, MemorialStatus.PUBLISHED, MemorialStatus.DEACTIVATED}),
+    MemorialStatus.PENDING_APPROVAL: frozenset({MemorialStatus.PUBLISHED, MemorialStatus.DRAFT, MemorialStatus.DEACTIVATED}),
+    MemorialStatus.PUBLISHED: frozenset({MemorialStatus.FEATURED, MemorialStatus.DEACTIVATED}),
+    MemorialStatus.FEATURED: frozenset({MemorialStatus.DEACTIVATED}),
+    MemorialStatus.DEACTIVATED: frozenset({MemorialStatus.DRAFT, MemorialStatus.PENDING_APPROVAL, MemorialStatus.PUBLISHED}),
 }
 
 
@@ -42,6 +43,8 @@ def apply_status_transition(memorial, target: MemorialStatus) -> None:
         if memorial.published_at is None:
             memorial.published_at = now
         memorial.featured_at = now
+    elif target == MemorialStatus.DEACTIVATED:
+        memorial.featured_at = None
 
 
 def review_pending_memorial(memorial, decision: str) -> None:

@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { routing, type Locale } from "@/i18n/routing";
 import { persianSans } from "@/lib/fonts";
 import { PWARegister } from "@/components/PWARegister";
+import { AppNotifications } from "@/components/ui/AppNotifications";
 import { SWRProvider } from "@/providers/SWRProvider";
 import { isRtlLocale } from "@/lib/theme";
 import "@/styles/globals.css";
@@ -45,10 +46,11 @@ export async function generateMetadata({
     },
     icons: {
       icon: [
-        { url: "/icon.svg", type: "image/svg+xml" },
-        { url: "/pwa-icon.svg", type: "image/svg+xml", sizes: "any" },
+        { url: "/assets/img/icon.png", type: "image/png", sizes: "400x400" },
+        { url: "/assets/img/icon512.png", type: "image/png", sizes: "512x512" },
       ],
-      apple: [{ url: "/pwa-icon.svg", type: "image/svg+xml" }],
+      shortcut: [{ url: "/assets/img/icon.png", type: "image/png", sizes: "400x400" }],
+      apple: [{ url: "/assets/img/icon512.png", type: "image/png", sizes: "512x512" }],
     },
   };
 }
@@ -90,6 +92,7 @@ export default async function LocaleLayout({
         <NextIntlClientProvider messages={messages}>
           <SWRProvider>
             {children}
+            <AppNotifications />
             <PWARegister />
           </SWRProvider>
         </NextIntlClientProvider>

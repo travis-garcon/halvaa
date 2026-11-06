@@ -25,6 +25,7 @@
     }
   },
   "section": {
+    "featured_by_halvaa": "Featured by Halvaa",
     "recently_passed": "Recently Passed",
     "loving_memory": "In Loving Memory",
     "updates": "Updates",
@@ -32,6 +33,41 @@
     "remembered_today": "Remembered Today",
     "memorial_anniversaries": "Memorial Anniversaries",
     "see_all": "See All"
+  },
+  "memorialBadges": {
+    "featured": { "label": "Featured by Halvaa", "description": "Gold badge: selected and featured by a Halvaa administrator." },
+    "verified": { "label": "Verified", "description": "Blue tick: this memorial has active Halvaa verification." },
+    "popular": { "label": "Popular", "description": "Gray tick: this memorial has reached at least 1,000 views." }
+  },
+  "landingInfo": {
+    "video": {
+      "eyebrow": "How Halvaa feels",
+      "title": "A calm place for stories, photos, and family memory.",
+      "body": "Watch how a memorial can hold a life story, family tree, map, gallery, and messages in one simple page.",
+      "play": "Play Halvaa introduction video"
+    },
+    "faq": {
+      "eyebrow": "Questions",
+      "title": "Before you create a memorial",
+      "items": [
+        {
+          "question": "Can I create a memorial for someone in my family?",
+          "answer": "Yes. Create an account, add the person’s story, and only share information you are allowed to publish."
+        },
+        {
+          "question": "Can I edit the memorial after publishing?",
+          "answer": "Yes. Owners and invited editors can update text, media, translations, locations, and visibility from the profile area."
+        },
+        {
+          "question": "Are memorials reviewed?",
+          "answer": "Halvaa keeps admin controls for moderation. Content that breaks rules can be edited, deleted, hidden, or connected accounts can be banned."
+        },
+        {
+          "question": "Can families share one memorial together?",
+          "answer": "Yes. Owners can invite collaborators, collect guestbook messages, and share the public memorial link when their profile is complete."
+        }
+      ]
+    }
   },
   "store": {
     "title": "Store",
@@ -50,7 +86,43 @@
     "purchase_history": "Purchase History",
     "no_purchases": "No purchases yet",
     "coming_soon_title": "Payments coming soon",
-    "coming_soon_body": "Credit purchases will be available in a future update. Your selection was noted."
+    "coming_soon_body": "Credit purchases will be available in a future update. Your selection was noted.",
+    "complete_test_checkout": "Complete test checkout",
+    "search": "Search store items",
+    "emptySearch": "No store items match your search.",
+    "viewDetails": "View details",
+    "continueToInvoice": "Review invoice",
+    "close": "Close",
+    "invoice": {
+      "eyebrow": "Order review",
+      "title": "Invoice",
+      "loading": "Loading invoice…",
+      "notFound": "This store item could not be found.",
+      "backStore": "Back to store",
+      "signIn": "Sign in before reviewing and paying this invoice.",
+      "signInAction": "Sign in",
+      "item": "Selected item",
+      "assignMemorial": "Assign to a memorial",
+      "chooseMemorial": "Choose one of your memorials",
+      "chooseMemorialError": "Choose a memorial before continuing.",
+      "assignedAccount": "This purchase will be assigned to your account.",
+      "paymentMethod": "Payment method",
+      "summary": "Invoice summary",
+      "product": "Product",
+      "gateway": "Gateway",
+      "total": "Total",
+      "pay": "Continue to payment",
+      "processing": "Preparing checkout…",
+      "checkoutError": "Checkout could not be created.",
+      "gatewayUnavailable": "This payment method is temporarily unavailable.",
+      "profileIncomplete": "Complete 100% of your profile, including your address, before buying anything.",
+      "completeProfile": "Complete profile",
+      "providers": {
+        "STRIPE": { "title": "Card / Stripe", "hint": "International card payment through Stripe." },
+        "ZARINPAL": { "title": "Zarinpal", "hint": "Iranian rial payment through Zarinpal." },
+        "CRYPTO": { "title": "Crypto", "hint": "Cryptocurrency payment through Coinbase Commerce." }
+      }
+    }
   },
   "auth": {
     "sign_in_sso": "Sign up with Google",
@@ -78,7 +150,26 @@
     "otp_code": "Verification code",
     "otp_verify": "Verify code",
     "otp_verifying": "Verifying…",
-    "otp_sent": "We sent a verification code to your email or phone."
+    "otp_sent": "We sent a verification code to your email or phone.",
+    "otp_debug_code": "Staging code: {code}",
+    "otp_delivery_error": "Could not send the verification code right now. Please try again in a moment.",
+    "avatar_url": "Avatar URL (optional)",
+    "profile_name_required": "Please enter your full name.",
+    "profile_save": "Save profile",
+    "profile_saving": "Saving profile...",
+    "avatar_invalid_type": "Choose a JPG, PNG, or WebP image.",
+    "avatar_too_large": "This photo is too large. Maximum size: {size}.",
+    "close": "Close",
+    "own_info_hint": "These are your account details, not the details of the person remembered.",
+    "your_full_name": "Your full name",
+    "your_full_name_example": "Example: Alex Morgan",
+    "your_photo": "Your profile photo",
+    "choose_your_photo": "Choose your photo",
+    "avatar_preview_title": "Profile photo preview",
+    "avatar_preview_hint": "This is how your profile photo will appear.",
+    "avatar_use": "Use this photo",
+    "cancel": "Cancel",
+    "remove": "Remove"
   },
   "memorial": {
     "create": "Create Memorial",
@@ -111,6 +202,8 @@
     "announcementTitle": "Family announcement",
     "epitaphTitle": "Words that remain",
     "storyEmpty": "This memorial does not yet include a life story or epitaph.",
+    "readMore": "Read more",
+    "showLess": "Show less",
     "galleryEmpty": "No gallery memories have been shared yet.",
     "documentsEyebrow": "Records & keepsakes",
     "documentsTitle": "Documents & final papers",
@@ -142,7 +235,27 @@
     "burialPlotLabel": "Plot",
     "burialAddressLabel": "Address",
     "burialWeatherLabel": "Weather",
-    "burialWeatherValue": "{temperature}°C"
+    "burialWeatherValue": "{temperature}°C",
+    "shareSheetEyebrow": "Share memorial",
+    "shareSheetTitle": "Scan or copy the link",
+    "shareSheetClose": "Close share sheet",
+    "shareSheetQrAlt": "QR code for this memorial",
+    "shareSheetUrlLabel": "Memorial URL",
+    "detailsEyebrow": "Life details",
+    "detailsTitle": "Details and places",
+    "categoryLabel": "Category",
+    "genderLabel": "Gender",
+    "occupationLabel": "Occupation",
+    "nationalityLabel": "Nationality",
+    "religionLabel": "Religion",
+    "birthPlaceLabel": "Birth place",
+    "deathPlaceLabel": "Death place",
+    "languagesLabel": "Languages",
+    "countriesLabel": "Countries",
+    "citiesLabel": "Cities lived in",
+    "placesLivedLabel": "Places lived",
+    "locationLabel": "Location",
+    "openMap": "Open map"
   },
   "guestbook": {
     "eyebrow": "Words from loved ones",
@@ -171,6 +284,7 @@
   },
   "common": {
     "close": "Close",
+    "menu": "Menu",
     "cancel": "Cancel",
     "save": "Save",
     "sign_in": "Sign In",
@@ -283,6 +397,7 @@
     "gridCount": "{count} memorials",
     "openModernExplore": "Open grid & map explore",
     "openMemorial": "Open memorial",
+    "loadMore": "Load more",
     "filters": {
       "all": "All",
       "featured": "Featured",
@@ -296,7 +411,17 @@
   },
   "createMemorial": {
     "title": "Create a Memorial",
-    "subtitle": "Honor a loved one with a lasting digital memorial. Start with a draft or submit it for approval when it is ready.",
+    "subtitle": "Honor a loved one with a lasting digital memorial. It publishes immediately with a random public ID; custom IDs can be assigned later from the store.",
+    "wizardTitle": "Memorial setup",
+    "stepCounter": "Step {current} of {total}",
+    "steps": {
+      "identity": "Identity",
+      "story": "Story",
+      "places": "Places",
+      "media": "Media"
+    },
+    "next": "Next",
+    "back": "Back",
     "fullName": "Full name",
     "slug": "Public link (slug)",
     "slugHint": "Lowercase letters, numbers, and hyphens only — e.g. margaret-thompson",
@@ -307,24 +432,157 @@
     "latitude": "Latitude",
     "longitude": "Longitude",
     "locationPreview": "Map location: {latitude}, {longitude}",
-    "workflowTitle": "Choose the next step",
-    "workflowHint": "Create a draft if you want to keep editing, or submit it for approval when the memorial is ready for review.",
+    "workflowTitle": "Publish immediately",
+    "workflowHint": "Memorials do not wait for admin approval. Admins can manage visibility, edits, and removals after publishing.",
+    "randomIdTitle": "Random public ID",
+    "randomIdHint": "A unique memorial link is generated automatically. Custom links are a paid service and can be assigned later when available.",
+    "translationTitle": "Translation processing",
+    "translationHint": "We save your original text first, then queue translation metadata so other language versions can be processed and edited.",
+    "randomIdPreview": "random-id",
     "submit": "Create memorial",
-    "saveDraft": "Create draft",
+    "saveDraft": "Publish memorial",
+    "publish": "Publish memorial",
     "submitForApproval": "Create and submit",
     "submitting": "Creating…",
+    "submittingWithMedia": "Creating and uploading…",
     "draftTitle": "Draft autosaved",
-    "draftHint": "Your inputs are saved locally on this device until you submit.",
+    "draftHint": "Your inputs are saved locally on this device for 2 days, so you can continue if the process is interrupted.",
+    "autosave": {
+      "waiting": "Your draft will save automatically after you enter the person's name.",
+      "saving": "Saving draft…",
+      "saved": "Draft saved automatically.",
+      "error": "Draft could not be saved. Keep this page open and try again."
+    },
+    "calendar": {
+      "persian": "Persian date",
+      "gregorian": "Gregorian date",
+      "year": "Year",
+      "month": "Month",
+      "day": "Day",
+      "converted": "Saved as Gregorian: {date}",
+      "empty": "Choose a complete date."
+    },
+    "sections": {
+      "identityTitle": "Who is this memorial for?",
+      "identityHint": "Enter information about the person who passed away, not your own account details.",
+      "storyTitle": "Their story and resting place",
+      "storyHint": "Add only the details that should appear on the public memorial.",
+      "mediaTitle": "Photos and gallery",
+      "mediaHint": "Choose the portrait, banner, and gallery files, then review each one before adding it."
+    },
+    "help": {
+      "fullName": "The passed person's full name. It appears at the top of the memorial.",
+      "birthDate": "The passed person's date of birth. It appears with their life dates.",
+      "deathDate": "The date they passed away. It appears with their life dates.",
+      "occupation": "Their occupation or main role. It appears in the memorial details.",
+      "biography": "A short story about their life. It appears in the biography section.",
+      "epitaph": "A brief memorial sentence shown near the top of the memorial.",
+      "familyTree": "Add relatives or close friends who should appear in the family section.",
+      "familyName": "The family member or friend's full name.",
+      "familyRelation": "Their relationship to the person, such as daughter, brother, or friend.",
+      "familyYears": "Optional birth and death years, for example 1940–2020.",
+      "restingPlace": "Add the burial or resting place shown in the memorial location section.",
+      "burialSiteName": "The cemetery, shrine, or resting-place name.",
+      "burialAddress": "The address visitors can use to find the resting place.",
+      "gallery": "Photos and videos appear in the memorial gallery slider."
+    },
+    "restingPlaceTitle": "Resting place",
+    "previewUploadTitle": "Memorial header preview",
+    "previewUploadHint": "This preview matches the banner and circular portrait shown on the memorial page.",
+    "bannerPreviewEmpty": "Choose a wide banner photo",
+    "choosePhoto": "Choose photo",
+    "galleryUploadTitle": "Gallery photos and videos",
+    "galleryPreviewTitle": "Gallery preview",
+    "chooseMedia": "Choose photos or videos",
+    "useSelectedMedia": "Use selected media",
+    "uploadInvalidType": "Choose an image or video file.",
+    "uploadTooLarge": "This file is too large. Maximum size: {size}.",
+    "uploadNetworkError": "The upload connection failed. Check your connection and try this file again.",
+    "uploadRateLimited": "Too many uploads were attempted. Wait a moment and try again.",
+    "publishSuccess": "The memorial was published successfully.",
+    "publishMediaWarning": "The memorial was published, but one or more media files could not be uploaded.",
+    "publishMediaError": "Your memorial is saved as a draft because one or more files could not be uploaded. Fix the failed files and publish again.",
+    "publishMediaErrorDetail": "Your memorial is saved as a draft. Failed upload: {details}",
+    "blankContinue": "Clear draft",
+    "blankClearing": "Clearing…",
+    "blankForm": "Blank form",
+    "blankConfirm": "Start a blank memorial form? This clears the saved draft on this device.",
     "previewTitle": "Preview memorial",
     "preview": "Preview",
     "edit": "Edit",
     "signInRequired": "Sign in to create a memorial",
     "signInBody": "You need an account to create and manage memorials.",
-    "signInHint": "Use Sign In in the header to continue.",
     "errorName": "Please enter a full name.",
     "errorSlug": "Please enter a valid public link.",
     "errorAuth": "Please sign in to create a memorial.",
-    "errorGeneric": "Could not create memorial. Please try again."
+    "errorGeneric": "Could not create memorial. Please try again.",
+    "agreementTitle": "Memorial content agreement",
+    "agreementIntro": "Before publishing, confirm that you are allowed to share this information and that it follows the laws and rules that apply in your country and the viewer's country.",
+    "agreementRules": {
+      "lawful": "Do not upload classified, restricted, illegal, or unlawfully obtained information.",
+      "personal": "Only share accurate memorial content. Do not publish fake claims about living people or impersonate another person.",
+      "safety": "Do not upload harmful, explicit, abusive, hateful, or exploitative content.",
+      "alivePeople": "Respect living people’s privacy and do not expose private data without permission.",
+      "admin": "Halvaa admins may edit, delete, deactivate, or remove content and may ban accounts that break these rules."
+    },
+    "agreementAccept": "I have read and accept these rules.",
+    "agreementContinue": "Accept and publish",
+    "announcement": "Announcement",
+    "burialAddress": "Burial address",
+    "burialSiteName": "Burial site",
+    "burialPlotName": "Burial plot",
+    "category": "Category",
+    "gender": "Gender",
+    "occupation": "Occupation",
+    "nationality": "Nationality",
+    "religion": "Religion",
+    "birthPlace": "Birth place",
+    "deathPlace": "Death place",
+    "languages": "Languages",
+    "countries": "Countries",
+    "cities": "Cities",
+    "placesLived": "Cities/places lived in",
+    "tags": "Tags",
+    "qrCodeUrl": "QR code URL",
+    "pickLocation": "Pick on map",
+    "locationsTitle": "Structured locations",
+    "locationsHint": "Add the important places that should be searchable and displayable.",
+    "addLocation": "Add location",
+    "locationKind": "Type",
+    "locationLabel": "Label",
+    "locationAddress": "Address",
+    "city": "City",
+    "country": "Country",
+    "remove": "Remove",
+    "familyTreeTitle": "Family tree",
+    "familyTreeAdd": "Add family member",
+    "familyTreeName": "Full name",
+    "familyTreeRelation": "Relationship",
+    "familyTreeYears": "Years",
+    "mediaCategory": "Default media category",
+    "dropFiles": "Drop files here or tap to choose",
+    "mediaUploadHint": "Files are uploaded after the memorial is created. Images show a preview; documents are kept in the file manager.",
+    "mediaEmpty": "No media staged yet. You can publish now and add files later, or add portraits, gallery images, documents, will files, and timeline media here.",
+    "mediaTitlePrompt": "Asset title",
+    "mediaDescriptionPrompt": "Asset description",
+    "bannerImage": "Banner image preview",
+    "portraitImage": "Portrait image preview",
+    "mediaSelectionFallback": "If you do not choose one, the first image will be used.",
+    "setAsPortrait": "Set as portrait",
+    "setAsBanner": "Set as banner",
+    "mediaStatus": {
+      "pending": "Pending",
+      "uploading": "Uploading",
+      "done": "Uploaded",
+      "error": "Failed"
+    },
+    "categories": {
+      "GALLERY": "Gallery image",
+      "DOCUMENT": "Document",
+      "WILL": "Will / testament",
+      "TIMELINE": "Timeline media",
+      "AVATAR": "Portrait"
+    }
   },
   "editMemorial": {
     "title": "Edit Memorial",
@@ -388,6 +646,18 @@
     "mediaEditDetails": "Edit details",
     "mediaTitlePrompt": "Asset title",
     "mediaDescriptionPrompt": "Asset description",
+    "headerImagesTitle": "Header images",
+    "headerImagesHint": "Choose which uploaded image appears as the portrait and the memorial banner.",
+    "portraitBadge": "Selected portrait",
+    "bannerBadge": "Selected banner",
+    "portraitSaved": "Portrait image updated.",
+    "bannerSaved": "Banner image updated.",
+    "setAsPortrait": "Set as portrait",
+    "setAsBanner": "Set as banner",
+    "translateNow": "Translate memorial",
+    "translating": "Translating…",
+    "translationStarted": "Translation request sent.",
+    "translationError": "Could not start translation.",
     "mediaDetailsSuccess": "Media details updated.",
     "mediaDetailsError": "Could not update media details.",
     "mediaOpen": "Open",
@@ -448,6 +718,18 @@
     "featureNow": "Feature memorial",
     "featureSuccess": "Memorial featured.",
     "featureError": "Could not feature this memorial.",
+    "translationEditorTitle": "Translated versions",
+    "translationEditorHint": "Choose a language and edit that saved version directly.",
+    "translationStatusHint": "Automatic translations are queued as metadata until a translation provider is configured.",
+    "deactivateMemorial": "Deactivate visibility",
+    "reactivateMemorial": "Reactivate as draft",
+    "deactivateConfirmFirst": "Deactivate this memorial? It will stop appearing publicly.",
+    "deactivateConfirmSecond": "Please confirm again. Public visitors will no longer see this memorial.",
+    "reactivateConfirmFirst": "Reactivate this memorial as a draft?",
+    "reactivateConfirmSecond": "Please confirm again. You can review it before making it public.",
+    "deactivateSuccess": "Memorial visibility deactivated.",
+    "reactivateSuccess": "Memorial reactivated as a draft.",
+    "visibilityError": "Could not update memorial visibility.",
     "reviewerTitle": "Reviewer controls",
     "reviewerHint": "Reviewer-only actions stay separate from owner editing. Use the review center for pending approvals, and feature published memorials here when needed.",
     "reviewActivityTitle": "Recent review activity",
@@ -475,7 +757,8 @@
       "DRAFT": "Save your edits and submit when this memorial is ready for review.",
       "PENDING_APPROVAL": "This memorial is waiting in the review queue. Keep editing if you need another pass later.",
       "PUBLISHED": "This memorial is public. Save changes anytime, or feature it if it should be highlighted.",
-      "FEATURED": "This memorial is public and highlighted in discovery feeds."
+      "FEATURED": "This memorial is public and highlighted in discovery feeds.",
+      "DEACTIVATED": "This memorial is hidden from public visitors until you reactivate it."
     },
     "roles": {
       "OWNER": "Owner",
@@ -486,8 +769,84 @@
       "DRAFT": "Draft",
       "PENDING_APPROVAL": "Pending approval",
       "PUBLISHED": "Published",
-      "FEATURED": "Featured"
-    }
+      "FEATURED": "Featured",
+      "DEACTIVATED": "Deactivated"
+    },
+    "burialAddress": "Burial address",
+    "metadataTitle": "Metadata and filters",
+    "metadataHint": "These fields power search, filters, map displays, and public profile details.",
+    "category": "Category",
+    "gender": "Gender",
+    "occupation": "Occupation",
+    "nationality": "Nationality",
+    "religion": "Religion",
+    "birthPlace": "Birth place",
+    "deathPlace": "Death place",
+    "languages": "Languages",
+    "countries": "Countries",
+    "cities": "Cities",
+    "placesLived": "Cities/places lived in",
+    "tags": "Tags",
+    "pickLocation": "Pick on map",
+    "locationsTitle": "Structured locations",
+    "locationsHint": "Add reusable map locations for birth, death, burial, residences, and other important places.",
+    "addLocation": "Add location",
+    "locationKind": "Type",
+    "locationLabel": "Label",
+    "locationAddress": "Address",
+    "city": "City",
+    "country": "Country",
+    "dropFiles": "Drop files here or tap to choose",
+    "uploadInvalidType": "Choose an image or video file.",
+    "uploadTooLarge": "This file is too large. Maximum size: {size}.",
+    "deleteSuccess": "Memorial deleted.",
+    "deleteError": "Could not delete memorial.",
+    "calendar": {
+      "persian": "Persian date",
+      "gregorian": "Gregorian date",
+      "year": "Year",
+      "month": "Month",
+      "day": "Day",
+      "converted": "Saved as Gregorian: {date}",
+      "empty": "Choose a complete date."
+    },
+    "autosave": {
+      "saving": "Saving draft…",
+      "saved": "Draft saved automatically.",
+      "error": "Draft could not be saved. Keep this page open and try again.",
+      "waiting": "Your draft will save automatically after you enter the person's name."
+    },
+    "wizardTitle": "Memorial setup",
+    "steps": {
+      "details": "Details",
+      "media": "Photos and media",
+      "manage": "Manage"
+    },
+    "help": {
+      "name": "The full name shown at the top of the memorial and in Explore.",
+      "birthDate": "The passed person's date of birth. It appears with their life dates.",
+      "deathDate": "The date they passed away. It appears with their life dates.",
+      "biography": "A short story about their life. It appears in the biography section.",
+      "epitaph": "A brief memorial sentence shown near the top of the memorial.",
+      "gallery": "Photos and videos appear in the memorial gallery slider.",
+      "timelineDate": "The date of this memory or life event.",
+      "portrait": "Upload the main portrait shown on the memorial and Explore cards.",
+      "banner": "Upload a wide banner shown at the top of the memorial."
+    },
+    "optionalDetails": "Optional details",
+    "bannerPreviewEmpty": "Choose a wide banner photo",
+    "bannerImage": "Banner photo",
+    "portraitImage": "Portrait photo",
+    "choosePhoto": "Choose photo",
+    "chooseMedia": "Choose photos or videos",
+    "deleteTitle": "Delete memorial",
+    "deleteHint": "This permanently removes the memorial and its media.",
+    "deleteAction": "Delete permanently",
+    "previewUploadTitle": "Memorial header preview",
+    "previewUploadHint": "This preview matches the banner and circular portrait shown on the memorial page.",
+    "useSelectedMedia": "Use selected media",
+    "deleteConfirm": "Delete {name}? This cannot be undone.",
+    "deleting": "Deleting…"
   },
   "messages": {
     "title": "Messages",
@@ -500,6 +859,27 @@
   "profile": {
     "title": "Profile",
     "subtitle": "Manage your account",
+    "tabLabel": "Profile sections",
+    "tabs": {
+      "memorials": "Memorial management",
+      "planStore": "Plan & Store",
+      "account": "Account information"
+    },
+    "completeProfile": "Complete my information",
+    "manageAccount": "Manage account information",
+    "completionDone": "Account information complete",
+    "profileCompletionValue": "Profile completion: {count}%",
+    "planStoreHint": "See your current limits or add services from the store.",
+    "openStore": "Open store",
+    "missingFields": "Still needed: {fields}",
+    "fieldNames": {
+      "full_name": "full name",
+      "email": "email",
+      "phone_number": "phone number",
+      "locale": "language",
+      "address": "address"
+    },
+    "removePhoto": "Remove photo",
     "loading": "Loading profile…",
     "account": "Account",
     "roles": {
@@ -576,7 +956,47 @@
       "memorials": "Memorials",
       "messages": "Messages",
       "credits": "Credits"
-    }
+    },
+    "accountDetails": "Account details",
+    "accountDetailsHint": "Edit your basic profile. The sign-in email or phone is locked.",
+    "profileIncomplete": "Profile incomplete",
+    "profileCompletion": "Profile completion",
+    "profileShareGate": "Complete your profile before sharing memorials publicly.",
+    "packageUsage": "Package usage",
+    "packageMemorials": "Memorial slots",
+    "packageCustomIds": "Unique ID assignments",
+    "packageRemaining": "{count} remaining",
+    "completeProfileToShare": "Complete profile to share",
+    "fullName": "Full name",
+    "locale": "Locale",
+    "email": "Email",
+    "phoneNumber": "Phone number",
+    "address": "Address",
+    "avatarUrl": "Avatar URL",
+    "saveAccount": "Save account",
+    "savingAccount": "Saving...",
+    "accountSaved": "Account updated.",
+    "accountSaveError": "Could not update account.",
+    "publishDraft": "Publish draft",
+    "publishingDraft": "Publishing…",
+    "publishDraftSuccess": "The draft was published successfully.",
+    "publishDraftError": "Could not publish this draft. Please check its media and try again.",
+    "avatarInvalidType": "Choose a JPG, PNG, or WebP image.",
+    "avatarTooLarge": "This photo is too large. Maximum size: {size}.",
+    "avatarSaved": "Profile photo updated.",
+    "deleteSuccess": "Memorial deleted.",
+    "deleteError": "Could not delete memorial.",
+    "filterDrafts": "Drafts",
+    "yourProfilePhoto": "Your profile photo",
+    "chooseProfilePhoto": "Choose a profile photo",
+    "searchMemorials": "Search your memorials",
+    "removeMemorial": "Remove memorial",
+    "avatarPreviewTitle": "Profile photo preview",
+    "avatarPreviewHint": "This is how your profile photo will appear.",
+    "useProfilePhoto": "Use profile photo",
+    "deleteTitle": "Delete memorial",
+    "deleteConfirm": "Delete {name}? This cannot be undone.",
+    "deleting": "Deleting…"
   },
   "metadata": {
     "title": "Halvaa - Where Memories Live Forever",
@@ -603,5 +1023,131 @@
     "submitted": "Suggestion submitted for review.",
     "error": "Could not submit suggestion.",
     "signInRequired": "Sign in first to suggest edits."
+  },
+  "locationPicker": {
+    "title": "Pick a location",
+    "hint": "Tap the map to set the point.",
+    "selected": "Selected: {latitude}, {longitude}",
+    "loading": "Loading map...",
+    "noToken": "Mapbox token is missing.",
+    "error": "Could not load the map.",
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Use this point"
+  },
+  "footer": {
+    "description": "Halvaa helps families preserve memorial profiles, memories, guestbook messages, and legacy records with dignity.",
+    "product": "Product",
+    "support": "Support",
+    "discover": "Discover memorials",
+    "legal": "Legal",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "userContent": "Memorial content is provided by users, families, contributors, and public records where noted."
+  },
+  "admin": {
+    "loading": "Loading...",
+    "required": "Admin role required.",
+    "admin": "Admin",
+    "console": "Console",
+    "summary": "Review growth, published content, income, and the memorials selected for the public landing experience.",
+    "publishedRatio": "Published ratio",
+    "users": "Users",
+    "memorials": "Memorials",
+    "published": "Published",
+    "guestbook": "Guestbook",
+    "income": "Income",
+    "incomeHint": "Revenue reflects paid or assigned purchases recorded by the store workflow.",
+    "placements": "Landing placements",
+    "placementsHint": "Memorials currently powering home page showcase rows.",
+    "activeRows": "{count} active rows",
+    "loadingPlacements": "Loading placements...",
+    "order": "order {order}",
+    "active": "active",
+    "inactive": "inactive",
+    "noLabel": "No label",
+    "emptyPlacements": "No landing placements have been configured."
+  },
+  "legalPages": {
+    "eyebrow": "Halvaa legal",
+    "lastUpdated": "Last updated",
+    "contact": {
+      "title": "Contact",
+      "body": "Questions, disputes, or takedown requests can be sent to support@halvaa.app."
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "use": {
+        "title": "Use of Halvaa",
+        "body1": "Halvaa provides tools for creating, preserving, discovering, and contributing to memorial pages. You agree to use the service respectfully and lawfully.",
+        "body2": "You are responsible for the content you submit, including memorial text, media, guestbook messages, corrections, and profile details."
+      },
+      "content": {
+        "title": "Memorial Content",
+        "body1": "Memorial pages may include family-submitted information, public records, contributor suggestions, and administrator-curated data. Content should be accurate, dignified, and relevant to the person remembered.",
+        "body2": "We may review, moderate, edit, reject, or remove content that is abusive, misleading, private without permission, unlawful, spammy, or inconsistent with the purpose of remembrance."
+      },
+      "accounts": {
+        "title": "Accounts and Security",
+        "body1": "You must keep your login credentials and verification codes secure. OTP codes are time-limited and should not be shared.",
+        "body2": "We may rate-limit, suspend, or restrict accounts that abuse authentication, uploads, guestbook messages, or contribution workflows."
+      },
+      "purchases": {
+        "title": "Purchases and Upgrades",
+        "body1": "Paid features, credits, featured placements, custom memorial IDs, and theme upgrades may be subject to availability, review, and payment-provider rules.",
+        "body2": "Unless required by law, completed digital purchases may be non-refundable after the feature has been assigned or used."
+      }
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "collect": {
+        "title": "Information We Collect",
+        "body1": "We collect account information such as email, phone number when provided, locale, authentication records, and profile details needed to operate the service.",
+        "body2": "Memorial data may include names, dates, locations, biographies, media, family history, timeline events, guestbook messages, and contributor suggestions."
+      },
+      "use": {
+        "title": "How We Use Information",
+        "body1": "We use data to provide memorial pages, authentication, moderation, search, discovery, collaboration, customer support, security, and service improvement.",
+        "body2": "OTP delivery may use email or SMS providers. Delivery logs may be kept for security, rate limiting, and troubleshooting."
+      },
+      "public": {
+        "title": "Public Memorials",
+        "body1": "Published memorial pages are intended to be discoverable and may be visible to visitors, search features, and public landing sections.",
+        "body2": "Private drafts, pending content, and moderation queues are restricted to authorized users and administrators."
+      },
+      "retention": {
+        "title": "Retention and Removal",
+        "body1": "We retain account, memorial, moderation, payment, and security records as needed to provide the service and comply with legal obligations.",
+        "body2": "Families, authorized collaborators, or affected parties may request correction, removal, or review by contacting support@halvaa.app."
+      },
+      "security": {
+        "title": "Security",
+        "body": "We use access controls, rate limits, validation, and review tools to protect the service. No internet service can guarantee absolute security."
+      }
+    },
+    "notice": {
+      "title": "Legal Notice",
+      "operator": {
+        "title": "Operator",
+        "body": "Halvaa is operated as a memorial and legacy platform. Formal company, mailing, and jurisdiction details should be completed before public commercial launch."
+      },
+      "ownership": {
+        "title": "Content Ownership",
+        "body1": "Users and contributors retain rights they hold in submitted content, while granting Halvaa permission to host, display, process, moderate, and distribute that content as needed to operate memorial pages.",
+        "body2": "Do not upload media or documents unless you have the right to share them."
+      },
+      "takedowns": {
+        "title": "Takedowns and Corrections",
+        "body": "If a memorial includes inaccurate, harmful, private, or unauthorized content, contact support@halvaa.app with the memorial link, your relationship to the person remembered, and the requested action."
+      },
+      "advice": {
+        "title": "No Professional Advice",
+        "body": "Halvaa does not provide legal, medical, religious, estate, or funeral advice. Memorial content is informational and commemorative."
+      },
+      "abuse": {
+        "title": "Abuse Reporting",
+        "body": "Report impersonation, harassment, spam, privacy violations, or unlawful content to support@halvaa.app."
+      }
+    }
   }
 }

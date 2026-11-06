@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 
+import { MemorialSearchCTA } from "@/components/MemorialSearchCTA";
+import { MemorialBadge } from "@/components/ui/MemorialBadge";
 import { useDiscoverMemorials } from "@/hooks/use-discover-memorials";
 import { Link } from "@/i18n/routing";
 
@@ -27,7 +29,7 @@ export function ExploreTeaser() {
   const locale = useLocale();
   const t = useTranslations("sections");
   const tExplore = useTranslations("explore");
-  const { memorials, error, isLoading } = useDiscoverMemorials("latest", locale, 6);
+  const { memorials, error, isLoading } = useDiscoverMemorials("latest", locale, "", 6);
   const featuredMemorials = memorials.slice(0, 6);
 
   return (
@@ -49,7 +51,8 @@ export function ExploreTeaser() {
             {error && featuredMemorials.length > 0 && <span>{tExplore("apiFallback")}</span>}
             {error && featuredMemorials.length === 0 && <span>{tExplore("apiError")}</span>}
           </div>
-          <div className="mt-8">
+          <div className="mt-8 flex flex-wrap gap-4">
+            <MemorialSearchCTA compact />
             <Link href="/explore" className="halvaa-btn-secondary inline-flex">
               {tExplore("openModernExplore")}
             </Link>
@@ -91,9 +94,10 @@ export function ExploreTeaser() {
                       {memorial.name.charAt(0)}
                     </div>
                     <div>
-                      <p className="line-clamp-2 text-base font-semibold text-foreground transition-colors duration-200 group-hover:text-primary">
-                        {memorial.name}
-                      </p>
+                      <div className="flex items-start gap-1.5">
+                        <p className="line-clamp-2 text-base font-semibold text-foreground transition-colors duration-200 group-hover:text-primary">{memorial.name}</p>
+                        <MemorialBadge status={memorial.status} isVerified={memorial.isVerified} viewCount={memorial.viewCount} />
+                      </div>
                       <p className="mt-1 font-mono text-[11px] text-muted">/{memorial.slug}</p>
                       {distance && distanceUnit && <p className="mt-3 text-xs text-muted">{distance} {distanceUnit}</p>}
                     </div>

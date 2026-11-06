@@ -59,6 +59,7 @@ class TestMemorialGraph:
         self, db_session: Session, sample_user: User
     ) -> None:
         memorial = Memorial(
+            public_id="test-memorial-translations",
             slug="test-memorial-translations",
             status=MemorialStatus.DRAFT,
             birth_date=date(1945, 3, 15),
@@ -93,6 +94,7 @@ class TestMemorialGraph:
         self, db_session: Session, sample_user: User
     ) -> None:
         memorial = Memorial(
+            public_id="rbac-test",
             slug="rbac-test",
             created_by_id=sample_user.id,
         )
@@ -119,7 +121,11 @@ class TestMemorialGraph:
     def test_timeline_guestbook_and_media_relationships(
         self, db_session: Session, sample_user: User
     ) -> None:
-        memorial = Memorial(slug="full-graph", created_by_id=sample_user.id)
+        memorial = Memorial(
+            public_id="full-graph",
+            slug="full-graph",
+            created_by_id=sample_user.id,
+        )
         db_session.add(memorial)
         db_session.commit()
         db_session.refresh(memorial)

@@ -24,7 +24,18 @@ def get_current_user_optional(
     request: Request,
     token: Annotated[str | None, Depends(oauth2_scheme)] = None,
 ) -> User | None:
-    # 1. Try Zitadel session cookie first
+    # Prefer an explicit bearer token. A stale session cookie must not override
+    # the account that the frontend just authenticated with OTP or password.
+    if token:
+        try:
+            user_id = decode_access_token(token)
+            user = session.get(User, user_id)
+            if user and user.is_active:
+                return user
+        except JWTError:
+            pass
+
+    # Fall back to the Zitadel session cookie for browser-only sessions.
     try:
         user_id_str = request.session.get("user_id")
         if user_id_str:
@@ -37,16 +48,6 @@ def get_current_user_optional(
                 pass
     except (AttributeError, KeyError):
         pass
-
-    # 2. Fall back to JWT Bearer token (legacy)
-    if token:
-        try:
-            user_id = decode_access_token(token)
-            user = session.get(User, user_id)
-            if user and user.is_active:
-                return user
-        except JWTError:
-            pass
 
     return None
 

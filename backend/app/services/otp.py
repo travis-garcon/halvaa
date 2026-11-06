@@ -168,25 +168,42 @@ async def send_otp_message(*, email: str, code: str, phone_number: str | None = 
             await client.post(url, data=payload)
         return "kavenegar"
 
+    if phone_number and provider == "kavenegar" and not settings.sms_api_key and settings.environment != "production":
+        # Keep local/staging sign-in usable without accidentally exposing this
+        # fallback in production, where a real SMS provider is required.
+        print(f"[halvaa otp] {email} {phone_number}: {code}")
+        return "console"
+
     if phone_number and provider == "console":
         print(f"[halvaa otp] {email} {phone_number}: {code}")
         return "console"
 
-    if not phone_number and settings.smtp_host:
+    smtp_host = settings.smtp_host
+    if not smtp_host and not settings.smtp_direct_delivery and settings.environment in {"staging", "production"}:
+        smtp_host = "smtp"
+
+    if not phone_number and smtp_host:
         email_message = _build_email_message(email=email, code=code)
 
         def send_email() -> None:
-            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, local_hostname=settings.smtp_helo_domain, timeout=10) as smtp:
-                if settings.smtp_use_tls:
-                    smtp.starttls()
-                if settings.smtp_username and settings.smtp_password:
-                    smtp.login(settings.smtp_username, settings.smtp_password)
-                smtp.send_message(email_message)
+            try:
+                with smtplib.SMTP(smtp_host, settings.smtp_port, local_hostname=settings.smtp_helo_domain, timeout=10) as smtp:
+                    if settings.smtp_use_tls:
+                        smtp.starttls()
+                    if settings.smtp_username and settings.smtp_password:
+                        smtp.login(settings.smtp_username, settings.smtp_password)
+                    smtp.send_message(email_message)
+            except (OSError, smtplib.SMTPException) as exc:
+                raise OtpDeliveryError(f"SMTP delivery failed: {exc}") from exc
 
         import anyio
 
         await anyio.to_thread.run_sync(send_email)
         return "smtp"
+
+    if not phone_number and settings.environment != "production":
+        print(f"[halvaa otp] {email}: {code}")
+        return "console"
 
     if not phone_number and settings.smtp_direct_delivery:
         email_message = _build_email_message(email=email, code=code)

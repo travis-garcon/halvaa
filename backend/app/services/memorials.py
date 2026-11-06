@@ -11,7 +11,7 @@ from app.models.timeline import TimelineEvent
 from app.models.user import User
 from app.schemas.memorial import MemorialProfilePublic, MemorialPublic
 from app.schemas.timeline import TimelineEventPublic
-from app.services.media_public import media_asset_to_public
+from app.services.media_public import media_asset_is_available, media_asset_to_public
 
 
 def apply_coordinates(memorial: Memorial, latitude: float | None, longitude: float | None) -> None:
@@ -63,8 +63,16 @@ def memorial_to_public(session: Session, memorial: Memorial) -> MemorialPublic:
         burial_plot_name=memorial.burial_plot_name,
         qr_code_url=memorial.qr_code_url,
         translations=memorial.translations,
+        translation_status=memorial.meta.get("translation_status", {}) if isinstance(memorial.meta, dict) else {},
         theme_overrides=memorial.theme_overrides,
         family_tree=memorial.family_tree,
+        category=memorial.category,
+        metadata=memorial.meta,
+        filter_tags=memorial.filter_tags,
+        is_verified=memorial.is_verified,
+        verified_at=memorial.verified_at,
+        view_count=memorial.view_count,
+        locations=memorial.locations,
         latitude=latitude,
         longitude=longitude,
         created_at=memorial.created_at,
@@ -96,7 +104,7 @@ def memorial_to_profile_public(session: Session, memorial: Memorial) -> Memorial
     timeline_events: list[TimelineEventPublic] = []
     for event in timeline_rows:
         thumb_url = None
-        if event.media_id and event.media_id in media_by_id:
+        if event.media_id and event.media_id in media_by_id and media_asset_is_available(media_by_id[event.media_id]):
             thumb_url = media_asset_to_public(media_by_id[event.media_id]).thumbnail_url
         timeline_events.append(
             TimelineEventPublic(
@@ -118,6 +126,7 @@ def memorial_to_profile_public(session: Session, memorial: Memorial) -> Memorial
         )
         .order_by(MediaAsset.sort_order.asc(), MediaAsset.created_at.desc())
     ).all()
+    gallery_assets = [asset for asset in gallery_assets if media_asset_is_available(asset)]
 
     document_assets = session.exec(
         select(MediaAsset)
@@ -127,6 +136,7 @@ def memorial_to_profile_public(session: Session, memorial: Memorial) -> Memorial
         )
         .order_by(MediaAsset.sort_order.asc(), MediaAsset.created_at.desc())
     ).all()
+    document_assets = [asset for asset in document_assets if media_asset_is_available(asset)]
 
     all_assets = session.exec(
         select(MediaAsset)
@@ -136,7 +146,8 @@ def memorial_to_profile_public(session: Session, memorial: Memorial) -> Memorial
     artifact_assets = [
         asset
         for asset in all_assets
-        if isinstance(asset.translations, dict)
+        if media_asset_is_available(asset)
+        and isinstance(asset.translations, dict)
         and isinstance(asset.translations.get("meta"), dict)
         and asset.translations.get("meta", {}).get("asset_kind") == "ARTIFACT"
     ]

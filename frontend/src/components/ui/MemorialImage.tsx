@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import type { CSSProperties } from "react";
 
-import { HALVAA_BLUR_DATA_URL, resolveImageUrl } from "@/lib/blur";
+import { HALVAA_BLUR_DATA_URL, isUploadImageUrl, resolveImageUrl } from "@/lib/blur";
 
 type MemorialImageProps = {
   src?: string | null;
@@ -21,15 +22,28 @@ export function MemorialImage({
 }: MemorialImageProps) {
   const resolved = resolveImageUrl(src ?? undefined);
   const letter = (fallbackLetter ?? alt.charAt(0)).toUpperCase();
+  const circleStyle: CSSProperties = {
+    width: size,
+    height: size,
+    minWidth: size,
+    minHeight: size,
+    maxWidth: size,
+    maxHeight: size,
+    aspectRatio: "1 / 1",
+    borderRadius: "50%",
+    objectFit: "cover",
+    flexShrink: 0,
+    overflow: "hidden",
+  };
 
   if (!resolved) {
     return (
       <div
         className={[
-          "flex items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-lg font-semibold text-primary",
+          "memorial-portrait-image flex items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-lg font-semibold text-primary",
           className,
         ].join(" ")}
-        style={{ width: size, height: size }}
+        style={circleStyle}
         aria-hidden={!alt}
       >
         {letter}
@@ -45,7 +59,9 @@ export function MemorialImage({
       height={size}
       placeholder="blur"
       blurDataURL={HALVAA_BLUR_DATA_URL}
-      className={["rounded-full object-cover", className].join(" ")}
+      unoptimized={isUploadImageUrl(resolved)}
+      className={["memorial-portrait-image rounded-full object-cover", className].join(" ")}
+      style={circleStyle}
     />
   );
 }
